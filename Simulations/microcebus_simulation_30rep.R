@@ -1,6 +1,5 @@
-## This vignette demonstrates how to simulate a Microcebus-like 
-## capture-recapture dataset and analyze it using a custom capture-recapture
-## model in NIMBLE (de Valpine et al., 2017).
+## This script simulates a Microcebus-like capture-recapture dataset
+## and analyze it using a custom capture-recapture model in NIMBLE 
 rm(list=ls())
 
 ## Load Libraries 
@@ -8,14 +7,16 @@ library(nimble)
 library(basicMCMCplots)
 library(coda)
 
-WD <- "C:/Users/pidu/OneDrive - Norwegian University of Life Sciences/PROJECTS/MICROCEBE/SIMULATIONS/simulation_1"
+
+## Load personal working directories
+source("workingDirectories.R")
 
 
-## --------------------------------------------------------------------------------------
+WD <- file.path(simDir, "simulation1")
+
+## -----------------------------------------------------------------------------
 ## ----- I. Simulate Data -----
-
-
-## Here, I simulate a population of Microcebus
+## Here, we simulate a population of Microcebus
 ## based (approx.) on the life-history of Mandena's Microcebes. 
 N0 <- 50                               ## Initial population size       
 n.years <- 6                           ## Number of years simulated
@@ -28,7 +29,7 @@ meanDuration <- 4
 lambdaDet <- 0.45
 propSession <- 0.46
 
-for(rep in 1:10){
+for(rep in 1:30){
 ## -----  1. Simulate population dynamics -----
 ## We start by initializing simulation objects.
 POP <- list()                          ## List of population composition 
@@ -122,7 +123,7 @@ for(t in 1:(length(sessionIndex)-1)){
   dt2[t] <- sum(season[start.int[t]:end.int[t]] == 2)
 }#t
 
-## ----------------------------------------------------------------------------------------------
+## -----------------------------------------------------------------------------
 ## ----- II. Fit the model with NIMBLE -----
 ## -----  1. NIMBLE model code -----
 modelCode <- nimbleCode({
@@ -141,8 +142,6 @@ modelCode <- nimbleCode({
   
   for(t in 1:n.intervals){
     phi[t] <- prod(PHI[start.int[t]:end.int[t]])
-    # phi[t] <- getPhi(phiVec = PHI[start.int[t]:end.int[t]])
-    # phi[t] <- pow(phi0[1], dt1[t]) * pow(phi0[2], dt2[t]) # Session-specific survival probabilities
   }# time
   
   for(i in 1:n.individuals){
@@ -167,7 +166,7 @@ modelCode <- nimbleCode({
     }#t
   }#i
   
-  ##------------------------------------------------------------------------------------------------------------------
+  ##----------------------------------------------------------------------------
 })
 
 
@@ -245,11 +244,13 @@ MCMC_runtime <- system.time(
 
 plot(samples)
 
-save(samples, file = file.path(WD,paste("sim_",rep,".RData",sep="")))
+save(samples, file = file.path(simDir, "simulation1",
+                               paste("sim_",rep,".RData",sep="")))
 
 }#rep
 
-## ----------------------------------------------------------------------------------------------
+
+## -----------------------------------------------------------------------------
 ## ----- III. Plot Relative Bias -----
 parm_true <- c(beta, lambdaDet, phi0)
 plot(1, type = "n", axes = F, ylab = "", xlab = "", xlim = c(0.5,5.5), ylim = c(-2,2))
@@ -269,4 +270,4 @@ for(rep in 1:30){
 
 
 
-## ----------------------------------------------------------------------------------------------
+## -----------------------------------------------------------------------------

@@ -8,7 +8,7 @@ library(nimble)
 library(basicMCMCplots)
 library(coda)
 
-## --------------------------------------------------------------------------------------
+## -----------------------------------------------------------------------------
 ## ----- I. Simulate Data -----
 ## -----  1. Simulate population dynamics -----
 ## Here, I simulate a population of Microcebus
