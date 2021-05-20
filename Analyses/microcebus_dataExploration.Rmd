@@ -1,0 +1,65 @@
+---
+title: "Microcebus Capture-Recapture : data exploration"
+author: "Pierre Dupont"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Microcebus Capture-Recapture}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r child = "C:/Users/pidu/OneDrive - Norwegian University of Life Sciences/PROJECTS/demo-rmd-snow-main/snow.Rmd"}
+```
+
+This vignette explores the Microcebus ganzhorni dataset.
+
+## Load dataset
+
+```{r data}
+WD <- "C:/Users/pidu/Dropbox (Personal)/Mouse lemur CMR data/02_Data"
+data <- read.csv2( file = file.path(WD, "cmr_mhc_input_data_microcebus.csv"),
+                   header = T, fill = T, 
+                   sep = ",")
+# data <- read.csv2( file = "Masterfile_Mandena.csv",
+#                    header = T, fill = T, 
+#                    sep = ",")
+head(data)
+```
+
+## Explore Data
+
+We start by subsetting the data to Microcebus captures only and reformat the dates.
+
+```{r}
+table(data$Genre)
+data <- data[data$Genre == "Microcebus", ]
+data$Date <- as.POSIXct(strptime(data$Date, "%m/%d/%Y"))
+data$Year <- as.numeric(format(data$Date,"%Y"))
+data$Month <- as.numeric(format(data$Date,"%m"))
+data$Day <- as.numeric(format(data$Date,"%d"))
+```
+
+Then, we can look at the number of individuals captured per sex, per year, per month and per day.
+
+```{r}
+data$Sexe[!data$Sexe %in% c("f","m")] <- NA
+barplot(table(data$Sexe), col = c("gray40", "gray80"), border = F)
+
+hist(data$Month, breaks = 0:12, main = "", border = F,
+     ylab = "number of captures/month",
+     xlab = "months", col = "gray60")
+
+hist(data$Day, breaks = 0:31, main = "", border = F,
+     ylab = "number of captures/day",
+     xlab = "days", col = "gray60")
+
+table(data$Year,data$Month)
+
+```
+
+### Set simulation parameter values
+
+```{r sim parms}
+hist(table(data$Transponder), border = F)
+```

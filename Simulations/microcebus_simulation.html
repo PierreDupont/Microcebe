@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+<meta name="author" content="Pierre Dupont" />
+
+<meta name="date" content="2021-04-03" />
+
+<title>Microcebus Capture-Recapture : a simulation study</title>
+
+
+<style type="text/css">
+  code{white-space: pre-wrap;}
+  span.smallcaps{font-variant: small-caps;}
+  span.underline{text-decoration: underline;}
+  div.column{display: inline-block; vertical-align: top; width: 50%;}
+  div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+  ul.task-list{list-style: none;}
+    </style>
+
+
+<style type="text/css">code{white-space: pre;}</style>
+<style type="text/css" data-origin="pandoc">
+a.sourceLine { display: inline-block; line-height: 1.25; }
+a.sourceLine { pointer-events: none; color: inherit; text-decoration: inherit; }
+a.sourceLine:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode { white-space: pre; position: relative; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+code.sourceCode { white-space: pre-wrap; }
+a.sourceLine { text-indent: -1em; padding-left: 1em; }
+}
+pre.numberSource a.sourceLine
+  { position: relative; left: -4em; }
+pre.numberSource a.sourceLine::before
+  { content: attr(title);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; pointer-events: all; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+    color: #aaaaaa;
+  }
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+div.sourceCode
+  {  }
+@media screen {
+a.sourceLine::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+code span.at { color: #7d9029; } /* Attribute */
+code span.bn { color: #40a070; } /* BaseN */
+code span.bu { } /* BuiltIn */
+code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+code span.ch { color: #4070a0; } /* Char */
+code span.cn { color: #880000; } /* Constant */
+code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+code span.dt { color: #902000; } /* DataType */
+code span.dv { color: #40a070; } /* DecVal */
+code span.er { color: #ff0000; font-weight: bold; } /* Error */
+code span.ex { } /* Extension */
+code span.fl { color: #40a070; } /* Float */
+code span.fu { color: #06287e; } /* Function */
+code span.im { } /* Import */
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+code span.op { color: #666666; } /* Operator */
+code span.ot { color: #007020; } /* Other */
+code span.pp { color: #bc7a00; } /* Preprocessor */
+code span.sc { color: #4070a0; } /* SpecialChar */
+code span.ss { color: #bb6688; } /* SpecialString */
+code span.st { color: #4070a0; } /* String */
+code span.va { color: #19177c; } /* Variable */
+code span.vs { color: #4070a0; } /* VerbatimString */
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+
+</style>
+<script>
+// apply pandoc div.sourceCode style to pre.sourceCode instead
+(function() {
+  var sheets = document.styleSheets;
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].ownerNode.dataset["origin"] !== "pandoc") continue;
+    try { var rules = sheets[i].cssRules; } catch (e) { continue; }
+    for (var j = 0; j < rules.length; j++) {
+      var rule = rules[j];
+      // check if there is a div.sourceCode rule
+      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") continue;
+      var style = rule.style.cssText;
+      // check if color or background-color is set
+      if (rule.style.color === '' && rule.style.backgroundColor === '') continue;
+      // replace div.sourceCode by a pre.sourceCode rule
+      sheets[i].deleteRule(j);
+      sheets[i].insertRule('pre.sourceCode{' + style + '}', j);
+    }
+  }
+})();
+</script>
+
+
+
+
+<style type="text/css">body {
+background-color: #fff;
+margin: 1em auto;
+max-width: 700px;
+overflow: visible;
+padding-left: 2em;
+padding-right: 2em;
+font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+font-size: 14px;
+line-height: 1.35;
+}
+#TOC {
+clear: both;
+margin: 0 0 10px 10px;
+padding: 4px;
+width: 400px;
+border: 1px solid #CCCCCC;
+border-radius: 5px;
+background-color: #f6f6f6;
+font-size: 13px;
+line-height: 1.3;
+}
+#TOC .toctitle {
+font-weight: bold;
+font-size: 15px;
+margin-left: 5px;
+}
+#TOC ul {
+padding-left: 40px;
+margin-left: -1.5em;
+margin-top: 5px;
+margin-bottom: 5px;
+}
+#TOC ul ul {
+margin-left: -2em;
+}
+#TOC li {
+line-height: 16px;
+}
+table {
+margin: 1em auto;
+border-width: 1px;
+border-color: #DDDDDD;
+border-style: outset;
+border-collapse: collapse;
+}
+table th {
+border-width: 2px;
+padding: 5px;
+border-style: inset;
+}
+table td {
+border-width: 1px;
+border-style: inset;
+line-height: 18px;
+padding: 5px 5px;
+}
+table, table th, table td {
+border-left-style: none;
+border-right-style: none;
+}
+table thead, table tr.even {
+background-color: #f7f7f7;
+}
+p {
+margin: 0.5em 0;
+}
+blockquote {
+background-color: #f6f6f6;
+padding: 0.25em 0.75em;
+}
+hr {
+border-style: solid;
+border: none;
+border-top: 1px solid #777;
+margin: 28px 0;
+}
+dl {
+margin-left: 0;
+}
+dl dd {
+margin-bottom: 13px;
+margin-left: 13px;
+}
+dl dt {
+font-weight: bold;
+}
+ul {
+margin-top: 0;
+}
+ul li {
+list-style: circle outside;
+}
+ul ul {
+margin-bottom: 0;
+}
+pre, code {
+background-color: #f7f7f7;
+border-radius: 3px;
+color: #333;
+white-space: pre-wrap; 
+}
+pre {
+border-radius: 3px;
+margin: 5px 0px 10px 0px;
+padding: 10px;
+}
+pre:not([class]) {
+background-color: #f7f7f7;
+}
+code {
+font-family: Consolas, Monaco, 'Courier New', monospace;
+font-size: 85%;
+}
+p > code, li > code {
+padding: 2px 0px;
+}
+div.figure {
+text-align: center;
+}
+img {
+background-color: #FFFFFF;
+padding: 2px;
+border: 1px solid #DDDDDD;
+border-radius: 3px;
+border: 1px solid #CCCCCC;
+margin: 0 5px;
+}
+h1 {
+margin-top: 0;
+font-size: 35px;
+line-height: 40px;
+}
+h2 {
+border-bottom: 4px solid #f7f7f7;
+padding-top: 10px;
+padding-bottom: 2px;
+font-size: 145%;
+}
+h3 {
+border-bottom: 2px solid #f7f7f7;
+padding-top: 10px;
+font-size: 120%;
+}
+h4 {
+border-bottom: 1px solid #f7f7f7;
+margin-left: 8px;
+font-size: 105%;
+}
+h5, h6 {
+border-bottom: 1px solid #ccc;
+font-size: 105%;
+}
+a {
+color: #0033dd;
+text-decoration: none;
+}
+a:hover {
+color: #6666ff; }
+a:visited {
+color: #800080; }
+a:visited:hover {
+color: #BB00BB; }
+a[href^="http:"] {
+text-decoration: underline; }
+a[href^="https:"] {
+text-decoration: underline; }
+
+code > span.kw { color: #555; font-weight: bold; } 
+code > span.dt { color: #902000; } 
+code > span.dv { color: #40a070; } 
+code > span.bn { color: #d14; } 
+code > span.fl { color: #d14; } 
+code > span.ch { color: #d14; } 
+code > span.st { color: #d14; } 
+code > span.co { color: #888888; font-style: italic; } 
+code > span.ot { color: #007020; } 
+code > span.al { color: #ff0000; font-weight: bold; } 
+code > span.fu { color: #900; font-weight: bold; } 
+code > span.er { color: #a61717; background-color: #e3d2d2; } 
+</style>
+
+
+
+
+</head>
+
+<body>
+
+
+
+
+<h1 class="title toc-ignore">Microcebus Capture-Recapture : a simulation study</h1>
+<h4 class="author">Pierre Dupont</h4>
+<h4 class="date">2021-04-03</h4>
+
+
+
+<div class="snowflakes" aria-hidden="true">
+<div class="snowflake">
+❅
+</div>
+<div class="snowflake">
+❅
+</div>
+<div class="snowflake">
+❆
+</div>
+<div class="snowflake">
+❄
+</div>
+<div class="snowflake">
+❅
+</div>
+<div class="snowflake">
+❆
+</div>
+<div class="snowflake">
+❄
+</div>
+<div class="snowflake">
+❅
+</div>
+<div class="snowflake">
+❆
+</div>
+<div class="snowflake">
+❄
+</div>
+</div>
+<style type="text/css">
+
+/* customizable snowflake styling */
+.snowflake {
+  color: lightblue;
+  font-size: 5em;
+  font-family: Arial;
+  text-shadow: 0 0 1px #000;
+}
+
+@-webkit-keyframes snowflakes-fall{0%{top:-10%}100%{top:100%}}@-webkit-keyframes snowflakes-shake{0%{-webkit-transform:translateX(0px);transform:translateX(0px)}50%{-webkit-transform:translateX(80px);transform:translateX(80px)}100%{-webkit-transform:translateX(0px);transform:translateX(0px)}}@keyframes snowflakes-fall{0%{top:-10%}100%{top:100%}}@keyframes snowflakes-shake{0%{transform:translateX(0px)}50%{transform:translateX(80px)}100%{transform:translateX(0px)}}.snowflake{position:fixed;top:-10%;z-index:9999;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;cursor:default;-webkit-animation-name:snowflakes-fall,snowflakes-shake;-webkit-animation-duration:10s,3s;-webkit-animation-timing-function:linear,ease-in-out;-webkit-animation-iteration-count:infinite,infinite;-webkit-animation-play-state:running,running;animation-name:snowflakes-fall,snowflakes-shake;animation-duration:10s,3s;animation-timing-function:linear,ease-in-out;animation-iteration-count:infinite,infinite;animation-play-state:running,running}.snowflake:nth-of-type(0){left:1%;-webkit-animation-delay:0s,0s;animation-delay:0s,0s}.snowflake:nth-of-type(1){left:10%;-webkit-animation-delay:1s,1s;animation-delay:1s,1s}.snowflake:nth-of-type(2){left:20%;-webkit-animation-delay:6s,.5s;animation-delay:6s,.5s}.snowflake:nth-of-type(3){left:30%;-webkit-animation-delay:4s,2s;animation-delay:4s,2s}.snowflake:nth-of-type(4){left:40%;-webkit-animation-delay:2s,2s;animation-delay:2s,2s}.snowflake:nth-of-type(5){left:50%;-webkit-animation-delay:8s,3s;animation-delay:8s,3s}.snowflake:nth-of-type(6){left:60%;-webkit-animation-delay:6s,2s;animation-delay:6s,2s}.snowflake:nth-of-type(7){left:70%;-webkit-animation-delay:2.5s,1s;animation-delay:2.5s,1s}.snowflake:nth-of-type(8){left:80%;-webkit-animation-delay:1s,0s;animation-delay:1s,0s}.snowflake:nth-of-type(9){left:90%;-webkit-animation-delay:3s,1.5s;animation-delay:3s,1.5s}
+/* Demo Purpose Only*/
+.demo {
+  font-family: 'Raleway', sans-serif;
+    color:#fff;
+    display: block;
+    margin: 0 auto;
+    padding: 15px 0;
+    text-align: center;
+}
+.demo a{
+  font-family: 'Raleway', sans-serif;
+color: #000;        
+}
+</style>
+<p>This vignette demonstrates how to simulate a Microcebus-like capture-recapture dataset and analyze it using a custom capture-recapture model in NIMBLE (de Valpine et al., 2017).</p>
+<div id="load-libraries" class="section level2">
+<h2>Load Libraries</h2>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb1-1" title="1"><span class="kw">library</span>(nimble)</a>
+<a class="sourceLine" id="cb1-2" title="2"><span class="kw">library</span>(basicMCMCplots)</a>
+<a class="sourceLine" id="cb1-3" title="3"><span class="kw">library</span>(coda)</a></code></pre></div>
+</div>
+<div id="simulate-data" class="section level2">
+<h2>Simulate Data</h2>
+<p>Here, we simulate a capture-recapture dataset based on the life-history and monitoring of Mandena’s Microcebuses. We start by setting the simulation parameter values.</p>
+<p>To simulate the population dynamics, we need to set up the number of individuals initially present (N0), as well as the demographic parameters.</p>
+<div id="set-simulation-characteristics" class="section level3">
+<h3>Set simulation characteristics</h3>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb2-1" title="1">N0 &lt;-<span class="st"> </span><span class="dv">50</span>                                           <span class="co">## Initial population size       </span></a>
+<a class="sourceLine" id="cb2-2" title="2">n.years &lt;-<span class="st"> </span><span class="dv">10</span>                                       <span class="co">## Number of years simulated</span></a>
+<a class="sourceLine" id="cb2-3" title="3">season &lt;-<span class="st"> </span><span class="kw">rep</span>(<span class="kw">c</span>(<span class="dv">1</span>,<span class="dv">1</span>,<span class="dv">1</span>,<span class="dv">1</span>,<span class="dv">1</span>,<span class="dv">1</span>,<span class="dv">1</span>,<span class="dv">1</span>,<span class="dv">2</span>,<span class="dv">2</span>,<span class="dv">2</span>,<span class="dv">2</span>), n.years) <span class="co">## Wet/dry seasons index</span></a>
+<a class="sourceLine" id="cb2-4" title="4">phi0 &lt;-<span class="st"> </span><span class="kw">c</span>(<span class="fl">0.98</span>,<span class="fl">0.87</span>)                                <span class="co">## Time- and season-specific survival</span></a>
+<a class="sourceLine" id="cb2-5" title="5">beta &lt;-<span class="st"> </span><span class="kw">c</span>(<span class="op">-</span><span class="fl">0.02</span>,<span class="op">-</span><span class="fl">0.01</span>)</a>
+<a class="sourceLine" id="cb2-6" title="6">r &lt;-<span class="st"> </span><span class="fl">0.08</span>                                          <span class="co">## Reproduction probability</span></a>
+<a class="sourceLine" id="cb2-7" title="7">litterSize &lt;-<span class="st"> </span><span class="kw">c</span>(<span class="fl">0.5</span>,<span class="fl">0.35</span>,<span class="fl">0.15</span>)                     <span class="co">## Vector of litter size probabilities</span></a></code></pre></div>
+<p>We also need to set the parameters for the sampling sessions (% of months sampled and mean duration of each sampling session)</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb3-1" title="1">meanDuration &lt;-<span class="st"> </span><span class="dv">4</span> </a>
+<a class="sourceLine" id="cb3-2" title="2">lambdaDet &lt;-<span class="st"> </span><span class="fl">0.45</span></a>
+<a class="sourceLine" id="cb3-3" title="3">propSession &lt;-<span class="st"> </span><span class="fl">0.46</span></a></code></pre></div>
+</div>
+<div id="generate-cmr-dataset" class="section level3">
+<h3>Generate CMR dataset</h3>
+<p>Now, we can start simulating the CMR dataset and initialize simulation objects.</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb4-1" title="1">POP &lt;-<span class="st"> </span><span class="kw">list</span>()                                       <span class="co">## List of population composition </span></a>
+<a class="sourceLine" id="cb4-2" title="2">POP[[<span class="dv">1</span>]] &lt;-<span class="st"> </span><span class="kw">rep</span>(<span class="dv">1</span>, N0)                              <span class="co">## Initial population composition</span></a>
+<a class="sourceLine" id="cb4-3" title="3">N &lt;-<span class="st"> </span><span class="kw">vector</span>()                                       <span class="co">## List of population size</span></a>
+<a class="sourceLine" id="cb4-4" title="4">N[<span class="dv">1</span>] &lt;-<span class="st"> </span>N0                                          <span class="co">## Initial population size</span></a></code></pre></div>
+<p>Then, we simulate individual- and time-specific survival, recruitment, and litter size. From that we derive monthly population sizes.</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb5-1" title="1">n.months &lt;-<span class="st"> </span><span class="dv">12</span><span class="op">*</span>n.years</a>
+<a class="sourceLine" id="cb5-2" title="2">phi &lt;-<span class="st"> </span><span class="ot">NULL</span> </a>
+<a class="sourceLine" id="cb5-3" title="3">start.int &lt;-<span class="st"> </span>end.int &lt;-<span class="st"> </span><span class="ot">NULL</span> </a>
+<a class="sourceLine" id="cb5-4" title="4"><span class="cf">for</span>(t <span class="cf">in</span> <span class="dv">2</span><span class="op">:</span>n.months){</a>
+<a class="sourceLine" id="cb5-5" title="5">  phi[t<span class="dv">-1</span>] &lt;-<span class="st"> </span><span class="dv">1</span><span class="op">/</span>(<span class="dv">1</span><span class="op">+</span><span class="kw">exp</span>(<span class="op">-</span>(<span class="kw">logit</span>(phi0[season[t]]) <span class="op">+</span><span class="st"> </span>beta[season[t]] <span class="op">*</span><span class="st"> </span>t)))</a>
+<a class="sourceLine" id="cb5-6" title="6">  Z &lt;-<span class="st"> </span>B &lt;-<span class="st"> </span><span class="kw">rep</span>(<span class="dv">0</span>,<span class="kw">length</span>(POP[[t<span class="dv">-1</span>]]))        </a>
+<a class="sourceLine" id="cb5-7" title="7">  <span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">1</span><span class="op">:</span><span class="kw">length</span>(POP[[t<span class="dv">-1</span>]])){       </a>
+<a class="sourceLine" id="cb5-8" title="8">    <span class="cf">if</span>(POP[[t<span class="dv">-1</span>]][i] <span class="op">==</span><span class="st"> </span><span class="dv">1</span>){         <span class="co">## Sample states only if individual is alive</span></a>
+<a class="sourceLine" id="cb5-9" title="9">      Z[i] &lt;-<span class="st"> </span><span class="kw">rbinom</span>(<span class="dv">1</span>, <span class="dv">1</span>, phi[t<span class="dv">-1</span>])<span class="co">## Sample individual survival</span></a>
+<a class="sourceLine" id="cb5-10" title="10">      repro &lt;-<span class="st"> </span><span class="kw">rbinom</span>(<span class="dv">1</span>, <span class="dv">1</span>, r<span class="op">*</span>Z[i]) <span class="co">## Sample individual repro (only if individual survived)</span></a>
+<a class="sourceLine" id="cb5-11" title="11">      <span class="cf">if</span>(repro<span class="op">==</span><span class="dv">1</span>){B[i] &lt;-<span class="st"> </span><span class="kw">sample</span>( <span class="dt">x =</span> <span class="dv">1</span><span class="op">:</span><span class="dv">3</span>,</a>
+<a class="sourceLine" id="cb5-12" title="12">                                   <span class="dt">size =</span> <span class="dv">1</span>,</a>
+<a class="sourceLine" id="cb5-13" title="13">                                   <span class="dt">prob =</span> litterSize)}<span class="co">## Sample individual litter size</span></a>
+<a class="sourceLine" id="cb5-14" title="14">    }<span class="co">#if</span></a>
+<a class="sourceLine" id="cb5-15" title="15">  }<span class="co">#i</span></a>
+<a class="sourceLine" id="cb5-16" title="16">  <span class="cf">if</span>(<span class="kw">sum</span>(B[]) <span class="op">&gt;</span><span class="st"> </span><span class="dv">0</span>){Z &lt;-<span class="st"> </span><span class="kw">c</span>(Z, <span class="kw">rep</span>(<span class="dv">1</span>,<span class="kw">sum</span>(B[])))}       <span class="co">## Add new recruits to the population vector</span></a>
+<a class="sourceLine" id="cb5-17" title="17">  N[t] &lt;-<span class="st"> </span><span class="kw">sum</span>(Z)                                     <span class="co">## New population size</span></a>
+<a class="sourceLine" id="cb5-18" title="18">  POP[[t]] &lt;-<span class="st"> </span>Z                                      <span class="co">## New population composition</span></a>
+<a class="sourceLine" id="cb5-19" title="19">  <span class="cf">if</span>(<span class="kw">length</span>(POP[[t]]) <span class="op">&gt;</span><span class="st"> </span><span class="dv">200000</span>)<span class="kw">stop</span>(<span class="st">&quot;pop size waayyyyyy too big...something is wrong!!!&quot;</span>) </a>
+<a class="sourceLine" id="cb5-20" title="20">}<span class="co">#t</span></a>
+<a class="sourceLine" id="cb5-21" title="21"></a>
+<a class="sourceLine" id="cb5-22" title="22"><span class="co">## Plot of the population trajectory</span></a>
+<a class="sourceLine" id="cb5-23" title="23"><span class="kw">plot</span>(<span class="dv">1</span><span class="op">:</span>n.months, N, <span class="dt">type =</span> <span class="st">&quot;l&quot;</span>, <span class="dt">axes =</span> F,</a>
+<a class="sourceLine" id="cb5-24" title="24">     <span class="dt">ylim =</span> <span class="kw">c</span>(<span class="dv">0</span>, <span class="kw">max</span>(N)), <span class="dt">lwd =</span> <span class="dv">2</span>,</a>
+<a class="sourceLine" id="cb5-25" title="25">     <span class="dt">ylab =</span> <span class="st">&quot;Population size&quot;</span>, <span class="dt">xlab =</span> <span class="st">&quot;years&quot;</span>)</a>
+<a class="sourceLine" id="cb5-26" title="26"><span class="kw">axis</span>(<span class="dt">side =</span> <span class="dv">1</span>, <span class="dt">at =</span> (<span class="dv">0</span><span class="op">:</span>n.years)<span class="op">*</span><span class="dv">12</span>, <span class="dt">labels =</span> <span class="dv">0</span><span class="op">:</span>n.years, <span class="dt">xlab =</span> <span class="st">&quot;years&quot;</span>)</a>
+<a class="sourceLine" id="cb5-27" title="27"><span class="kw">axis</span>(<span class="dt">side =</span> <span class="dv">2</span>)</a></code></pre></div>
+<p><img src="data:image/png;base64,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" /><!-- --></p>
+<p>Here, we re-organize individual life-histories in a matrix.</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb6-1" title="1">z &lt;-<span class="st"> </span><span class="kw">matrix</span>(<span class="dv">0</span>, <span class="kw">length</span>(POP[[n.months]]), n.months)</a>
+<a class="sourceLine" id="cb6-2" title="2"><span class="cf">for</span> (t <span class="cf">in</span> <span class="dv">1</span><span class="op">:</span>n.months){</a>
+<a class="sourceLine" id="cb6-3" title="3">  z[<span class="dv">1</span><span class="op">:</span><span class="kw">length</span>(POP[[t]]), t] &lt;-<span class="st"> </span>POP[[t]]</a>
+<a class="sourceLine" id="cb6-4" title="4">}<span class="co">#t</span></a></code></pre></div>
+<p>Then, we sample in which months the trapping sessions occured and how long each one lasts. (First and last sessions must be sampling sessions for the model to make sense)</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb7-1" title="1">sessionIndex &lt;-<span class="st"> </span><span class="kw">c</span>( <span class="dv">1</span>,</a>
+<a class="sourceLine" id="cb7-2" title="2">                   <span class="kw">sample</span>( <span class="dt">x =</span> <span class="dv">2</span><span class="op">:</span>(n.months<span class="dv">-1</span>),</a>
+<a class="sourceLine" id="cb7-3" title="3">                           <span class="dt">size =</span> <span class="kw">round</span>(propSession<span class="op">*</span>(n.months<span class="dv">-2</span>))),</a>
+<a class="sourceLine" id="cb7-4" title="4">                   n.months)</a>
+<a class="sourceLine" id="cb7-5" title="5">sessionIndex &lt;-<span class="st"> </span>sessionIndex[<span class="kw">order</span>(sessionIndex)]</a>
+<a class="sourceLine" id="cb7-6" title="6">n.sessions &lt;-<span class="st"> </span><span class="kw">length</span>(sessionIndex)</a></code></pre></div>
+<p>Before sampling individual observations for each session.</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb8-1" title="1">sessionDuration &lt;-<span class="st"> </span><span class="kw">rpois</span>(<span class="dt">n =</span> n.sessions, <span class="dt">lambda =</span> meanDuration)</a>
+<a class="sourceLine" id="cb8-2" title="2">p &lt;-<span class="st"> </span><span class="dv">1</span> <span class="op">-</span><span class="st"> </span><span class="kw">exp</span>(<span class="op">-</span>lambdaDet <span class="op">*</span><span class="st"> </span>sessionDuration)</a>
+<a class="sourceLine" id="cb8-3" title="3"></a>
+<a class="sourceLine" id="cb8-4" title="4">y &lt;-<span class="st"> </span><span class="kw">matrix</span>(<span class="dv">0</span>, <span class="kw">dim</span>(z)[<span class="dv">1</span>], n.sessions)</a>
+<a class="sourceLine" id="cb8-5" title="5"><span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">1</span><span class="op">:</span><span class="kw">dim</span>(z)[<span class="dv">1</span>]){</a>
+<a class="sourceLine" id="cb8-6" title="6">  <span class="cf">for</span> (t <span class="cf">in</span> <span class="dv">1</span><span class="op">:</span>n.sessions){</a>
+<a class="sourceLine" id="cb8-7" title="7">    y[i,t] &lt;-<span class="st"> </span><span class="kw">rbinom</span>(<span class="dt">size =</span> <span class="dv">1</span>, <span class="dt">n =</span> <span class="dv">1</span>, <span class="dt">prob =</span> p[t] <span class="op">*</span><span class="st"> </span>z[i,t])</a>
+<a class="sourceLine" id="cb8-8" title="8">  }<span class="co">#t</span></a>
+<a class="sourceLine" id="cb8-9" title="9">}<span class="co">#i</span></a></code></pre></div>
+<p>To match real-life CMR datasets, we need to filter out individuals that were never captured, as well as individuals that were detected for the first time on the last sampling session.</p>
+<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb9-1" title="1"><span class="co">## Keep only detected individuals</span></a>
+<a class="sourceLine" id="cb9-2" title="2">detected &lt;-<span class="st"> </span><span class="kw">apply</span>(y, <span class="dv">1</span>, <span class="cf">function</span>(x)<span class="kw">any</span>(x <span class="op">==</span><span class="st"> </span><span class="dv">1</span>))</a>
+<a class="sourceLine" id="cb9-3" title="3">y.detected &lt;-<span class="st"> </span>y[detected, ]</a>
+<a class="sourceLine" id="cb9-4" title="4"></a>
+<a class="sourceLine" id="cb9-5" title="5"><span class="co">## Extract the first detection occasion per individual</span></a>
+<a class="sourceLine" id="cb9-6" title="6">f &lt;-<span class="st"> </span><span class="kw">apply</span>(y.detected, <span class="dv">1</span>, <span class="cf">function</span>(x)<span class="kw">min</span>(<span class="kw">which</span>(x <span class="op">==</span><span class="st"> </span><span class="dv">1</span>)))</a>
+<a class="sourceLine" id="cb9-7" title="7"></a>
+<a class="sourceLine" id="cb9-8" title="8"><span class="co">## Remove individuals detected for the first time on the last session</span></a>
+<a class="sourceLine" id="cb9-9" title="9">y.detected &lt;-<span class="st"> </span>y.detected[<span class="kw">which</span>(f <span class="op">!=</span><span class="st"> </span><span class="kw">dim</span>(y.detected)[<span class="dv">2</span>]), ]</a>
+<a class="sourceLine" id="cb9-10" title="10">f &lt;-<span class="st"> </span>f[<span class="kw">which</span>(f <span class="op">!=</span><span class="st"> </span><span class="kw">dim</span>(y.detected)[<span class="dv">2</span>])]</a></code></pre></div>
+<p>To fit a model with both unequal time intervals between sampling sessions and sampling sessions that vary in duration, we have to identify which months correspongd to the start of each sampling session and the month that correspond to the end of the interval between two sampling sessions.</p>
+<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb10-1" title="1">start.int &lt;-<span class="st"> </span>end.int &lt;-<span class="st"> </span>dt1 &lt;-<span class="st"> </span>dt2 &lt;-<span class="st"> </span><span class="ot">NULL</span></a>
+<a class="sourceLine" id="cb10-2" title="2"><span class="cf">for</span>(t <span class="cf">in</span> <span class="dv">1</span><span class="op">:</span>(<span class="kw">length</span>(sessionIndex)<span class="op">-</span><span class="dv">1</span>)){</a>
+<a class="sourceLine" id="cb10-3" title="3">  start.int[t] &lt;-<span class="st"> </span>sessionIndex[t]</a>
+<a class="sourceLine" id="cb10-4" title="4">  end.int[t] &lt;-<span class="st"> </span>sessionIndex[t<span class="op">+</span><span class="dv">1</span>]<span class="op">-</span><span class="dv">1</span></a>
+<a class="sourceLine" id="cb10-5" title="5">  <span class="co"># dt1[t] &lt;- sum(season[start.int[t]:end.int[t]] == 1)</span></a>
+<a class="sourceLine" id="cb10-6" title="6">  <span class="co"># dt2[t] &lt;- sum(season[start.int[t]:end.int[t]] == 2)</span></a>
+<a class="sourceLine" id="cb10-7" title="7">}<span class="co">#t</span></a></code></pre></div>
+</div>
+</div>
+<div id="section" class="section level2">
+<h2>———————————————————————————————-</h2>
+</div>
+<div id="fit-the-model-with-nimble" class="section level2">
+<h2>Fit the model with NIMBLE</h2>
+<div id="define-nimble-model-structure" class="section level3">
+<h3>Define NIMBLE Model Structure</h3>
+<p>Here, we define the <code>NIMBLE</code> model.</p>
+<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb11-1" title="1">modelCode &lt;-<span class="st"> </span><span class="kw">nimbleCode</span>({</a>
+<a class="sourceLine" id="cb11-2" title="2">  <span class="co">##---------------------</span></a>
+<a class="sourceLine" id="cb11-3" title="3">  <span class="co">## DEMOGRAPHIC PROCESS </span></a>
+<a class="sourceLine" id="cb11-4" title="4">  phi0[<span class="dv">1</span>] <span class="op">~</span><span class="st"> </span><span class="kw">dunif</span>(<span class="dv">0</span>,<span class="dv">1</span>)</a>
+<a class="sourceLine" id="cb11-5" title="5">  phi0[<span class="dv">2</span>] <span class="op">~</span><span class="st"> </span><span class="kw">dunif</span>(<span class="dv">0</span>,<span class="dv">1</span>)</a>
+<a class="sourceLine" id="cb11-6" title="6">  logit.phi0[<span class="dv">1</span>] &lt;-<span class="st"> </span><span class="kw">logit</span>(phi0[<span class="dv">1</span>])</a>
+<a class="sourceLine" id="cb11-7" title="7">  logit.phi0[<span class="dv">2</span>] &lt;-<span class="st"> </span><span class="kw">logit</span>(phi0[<span class="dv">2</span>])</a>
+<a class="sourceLine" id="cb11-8" title="8">  beta[<span class="dv">1</span>] <span class="op">~</span><span class="st"> </span><span class="kw">dnorm</span>(<span class="dv">0</span>,<span class="fl">0.01</span>)</a>
+<a class="sourceLine" id="cb11-9" title="9">  beta[<span class="dv">2</span>] <span class="op">~</span><span class="st"> </span><span class="kw">dnorm</span>(<span class="dv">0</span>,<span class="fl">0.01</span>)</a>
+<a class="sourceLine" id="cb11-10" title="10">  <span class="cf">for</span>(m <span class="cf">in</span> <span class="dv">1</span><span class="op">:</span>n.months){</a>
+<a class="sourceLine" id="cb11-11" title="11">    <span class="co"># PHI[m] &lt;- phi0[season[m]] + beta[season[m]] * m</span></a>
+<a class="sourceLine" id="cb11-12" title="12">    <span class="kw">logit</span>(PHI[m]) &lt;-<span class="st"> </span>logit.phi0[season[m]] <span class="op">+</span><span class="st"> </span>beta[season[m]] <span class="op">*</span><span class="st"> </span>m</a>
+<a class="sourceLine" id="cb11-13" title="13">  }<span class="co"># months</span></a>
+<a class="sourceLine" id="cb11-14" title="14">  </a>
+<a class="sourceLine" id="cb11-15" title="15">  <span class="cf">for</span>(t <span class="cf">in</span> <span class="dv">1</span><span class="op">:</span>n.intervals){</a>
+<a class="sourceLine" id="cb11-16" title="16">    phi[t] &lt;-<span class="st"> </span><span class="kw">prod</span>(PHI[start.int[t]<span class="op">:</span>end.int[t]])</a>
+<a class="sourceLine" id="cb11-17" title="17">    <span class="co"># phi[t] &lt;- getPhi(phiVec = PHI[start.int[t]:end.int[t]])</span></a>
+<a class="sourceLine" id="cb11-18" title="18">    <span class="co"># phi[t] &lt;- pow(phi0[1], dt1[t]) * pow(phi0[2], dt2[t]) # Session-specific survival probabilities</span></a>
+<a class="sourceLine" id="cb11-19" title="19">  }<span class="co"># time</span></a>
+<a class="sourceLine" id="cb11-20" title="20">  </a>
+<a class="sourceLine" id="cb11-21" title="21">  <span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">1</span><span class="op">:</span>n.individuals){</a>
+<a class="sourceLine" id="cb11-22" title="22">    z[i,f[i]] <span class="op">~</span><span class="st"> </span><span class="kw">dbern</span>(<span class="dv">1</span>)  </a>
+<a class="sourceLine" id="cb11-23" title="23">    <span class="cf">for</span>(t <span class="cf">in</span> f[i]<span class="op">:</span>n.intervals){</a>
+<a class="sourceLine" id="cb11-24" title="24">      z[i,t<span class="op">+</span><span class="dv">1</span>] <span class="op">~</span><span class="st"> </span><span class="kw">dbern</span>(z[i,t] <span class="op">*</span><span class="st"> </span>phi[t])  </a>
+<a class="sourceLine" id="cb11-25" title="25">    }<span class="co">#t</span></a>
+<a class="sourceLine" id="cb11-26" title="26">  }<span class="co">#i</span></a>
+<a class="sourceLine" id="cb11-27" title="27">  </a>
+<a class="sourceLine" id="cb11-28" title="28">  <span class="co">##------------------</span></a>
+<a class="sourceLine" id="cb11-29" title="29">  <span class="co">## DETECTION PROCESS</span></a>
+<a class="sourceLine" id="cb11-30" title="30">  <span class="co">## Detection Hazard rate</span></a>
+<a class="sourceLine" id="cb11-31" title="31">  lambda <span class="op">~</span><span class="st"> </span><span class="kw">dgamma</span>(<span class="fl">0.01</span>,<span class="fl">0.01</span>)                   </a>
+<a class="sourceLine" id="cb11-32" title="32">  <span class="cf">for</span>(t <span class="cf">in</span> <span class="dv">1</span><span class="op">:</span>n.sessions){</a>
+<a class="sourceLine" id="cb11-33" title="33">    <span class="co">## Allows for unequal sampling sessions (sessionDuration[t])</span></a>
+<a class="sourceLine" id="cb11-34" title="34">    p[t] &lt;-<span class="st"> </span><span class="dv">1</span><span class="op">-</span><span class="kw">exp</span>(<span class="op">-</span>lambda <span class="op">*</span><span class="st"> </span>sessionDuration[t]) </a>
+<a class="sourceLine" id="cb11-35" title="35">  }<span class="co"># session</span></a>
+<a class="sourceLine" id="cb11-36" title="36">  </a>
+<a class="sourceLine" id="cb11-37" title="37">  <span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">1</span><span class="op">:</span>n.individuals){</a>
+<a class="sourceLine" id="cb11-38" title="38">    <span class="cf">for</span>(t <span class="cf">in</span> (f[i]<span class="op">+</span><span class="dv">1</span>)<span class="op">:</span>n.sessions){</a>
+<a class="sourceLine" id="cb11-39" title="39">      y[i,t] <span class="op">~</span><span class="st"> </span><span class="kw">dbern</span>(p[t] <span class="op">*</span><span class="st"> </span>z[i,t])</a>
+<a class="sourceLine" id="cb11-40" title="40">    }<span class="co">#t</span></a>
+<a class="sourceLine" id="cb11-41" title="41">  }<span class="co">#i</span></a>
+<a class="sourceLine" id="cb11-42" title="42">  </a>
+<a class="sourceLine" id="cb11-43" title="43">  <span class="co">##------------------------------------------------------------------------------------------------------------------</span></a>
+<a class="sourceLine" id="cb11-44" title="44">})</a></code></pre></div>
+</div>
+<div id="format-the-data-for-nimble" class="section level3">
+<h3>Format the data for NIMBLE</h3>
+<p>Then, we organize the simulated data in a format useable by NIMBLE; i.e. we create objects <code>constants</code>, <code>data</code>, and <code>inits</code> for later use in the function <code>nimbleModel</code>.</p>
+<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb12-1" title="1">nimData &lt;-<span class="st"> </span><span class="kw">list</span>( <span class="dt">y =</span> y.detected,</a>
+<a class="sourceLine" id="cb12-2" title="2">                 <span class="dt">sessionDuration =</span> sessionDuration )</a>
+<a class="sourceLine" id="cb12-3" title="3"></a>
+<a class="sourceLine" id="cb12-4" title="4">nimConstants &lt;-<span class="st"> </span><span class="kw">list</span>( <span class="dt">n.individuals =</span> <span class="kw">dim</span>(y.detected)[<span class="dv">1</span>],</a>
+<a class="sourceLine" id="cb12-5" title="5">                      <span class="dt">n.months =</span> n.months,</a>
+<a class="sourceLine" id="cb12-6" title="6">                      <span class="dt">n.intervals =</span> <span class="kw">dim</span>(y.detected)[<span class="dv">2</span>]<span class="op">-</span><span class="dv">1</span>,</a>
+<a class="sourceLine" id="cb12-7" title="7">                      <span class="dt">n.sessions =</span> <span class="kw">dim</span>(y.detected)[<span class="dv">2</span>],</a>
+<a class="sourceLine" id="cb12-8" title="8">                      <span class="dt">season =</span> season,</a>
+<a class="sourceLine" id="cb12-9" title="9">                      <span class="dt">f =</span> f,</a>
+<a class="sourceLine" id="cb12-10" title="10">                      <span class="dt">start.int =</span> start.int,</a>
+<a class="sourceLine" id="cb12-11" title="11">                      <span class="dt">end.int =</span> end.int)</a>
+<a class="sourceLine" id="cb12-12" title="12"></a>
+<a class="sourceLine" id="cb12-13" title="13"></a>
+<a class="sourceLine" id="cb12-14" title="14">l &lt;-<span class="st"> </span><span class="kw">apply</span>(nimData<span class="op">$</span>y, <span class="dv">1</span>, <span class="cf">function</span>(x)<span class="kw">max</span>(<span class="kw">which</span>(x <span class="op">==</span><span class="st"> </span><span class="dv">1</span>)))</a>
+<a class="sourceLine" id="cb12-15" title="15">z.init &lt;-<span class="st"> </span><span class="kw">matrix</span>(<span class="dt">data =</span>  <span class="ot">NA</span>,</a>
+<a class="sourceLine" id="cb12-16" title="16">                 <span class="dt">nrow =</span> <span class="kw">nrow</span>(nimData<span class="op">$</span>y),</a>
+<a class="sourceLine" id="cb12-17" title="17">                 <span class="dt">ncol =</span> <span class="kw">ncol</span>(nimData<span class="op">$</span>y))</a>
+<a class="sourceLine" id="cb12-18" title="18"><span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">1</span><span class="op">:</span><span class="kw">dim</span>(z.init)[<span class="dv">1</span>]){</a>
+<a class="sourceLine" id="cb12-19" title="19">  z.init[i,f[i]<span class="op">:</span>l[i]] &lt;-<span class="st"> </span><span class="dv">1</span></a>
+<a class="sourceLine" id="cb12-20" title="20">  <span class="cf">if</span>(l[i]<span class="op">&lt;</span><span class="kw">dim</span>(z.init)[<span class="dv">2</span>]){</a>
+<a class="sourceLine" id="cb12-21" title="21">    z.init[i,(l[i]<span class="op">+</span><span class="dv">1</span>)<span class="op">:</span>(<span class="kw">dim</span>(z.init)[<span class="dv">2</span>])] &lt;-<span class="st"> </span><span class="dv">0</span></a>
+<a class="sourceLine" id="cb12-22" title="22">  }</a>
+<a class="sourceLine" id="cb12-23" title="23">}<span class="co">#i</span></a>
+<a class="sourceLine" id="cb12-24" title="24">nimInits &lt;-<span class="st"> </span><span class="kw">list</span>( <span class="dt">z =</span> z.init,</a>
+<a class="sourceLine" id="cb12-25" title="25">                  <span class="dt">phi0 =</span> <span class="kw">c</span>(<span class="fl">0.85</span>,<span class="fl">0.85</span>),</a>
+<a class="sourceLine" id="cb12-26" title="26">                  <span class="dt">beta =</span> <span class="kw">c</span>(<span class="dv">0</span>,<span class="dv">0</span>),</a>
+<a class="sourceLine" id="cb12-27" title="27">                  <span class="dt">lambda =</span> <span class="fl">0.5</span>)</a></code></pre></div>
+</div>
+<div id="create-a-nimble-model-object" class="section level3">
+<h3>Create a NIMBLE model object</h3>
+<p>Now, we can create the <code>nimble</code> model object, using the model structure defined in <code>code</code>, and the constants, data, and initial values.</p>
+<div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb13-1" title="1">Rmodel &lt;-<span class="st"> </span><span class="kw">nimbleModel</span>( <span class="dt">code =</span> modelCode,</a>
+<a class="sourceLine" id="cb13-2" title="2">                       <span class="dt">constants =</span> nimConstants,</a>
+<a class="sourceLine" id="cb13-3" title="3">                       <span class="dt">data =</span> nimData,</a>
+<a class="sourceLine" id="cb13-4" title="4">                       <span class="dt">inits =</span> nimInits,</a>
+<a class="sourceLine" id="cb13-5" title="5">                       <span class="dt">calculate =</span> F)</a></code></pre></div>
+<pre><code>## defining model...</code></pre>
+<pre><code>## building model...</code></pre>
+<pre><code>## setting data and initial values...</code></pre>
+<pre><code>## checking model sizes and dimensions... This model is not fully initialized. This is not an error. To see which variables are not initialized, use model$initializeInfo(). For more information on model initialization, see help(modelInitialization).
+## model building finished.</code></pre>
+<div class="sourceCode" id="cb18"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb18-1" title="1">Rmodel<span class="op">$</span><span class="kw">calculate</span>()</a></code></pre></div>
+<pre><code>## [1] -11506.02</code></pre>
+</div>
+<div id="configure-and-build-mcmc-objects" class="section level3">
+<h3>Configure and Build MCMC objects</h3>
+<p>We configure an MCMC algorithm to the <code>Rmodel</code> model object.</p>
+<p>We assign MCMC monitors to <span class="math inline">\(\phi\)</span>, <span class="math inline">\(\gamma\)</span>, <span class="math inline">\(lambda\)</span>, and <span class="math inline">\(\psi\)</span>.</p>
+<div class="sourceCode" id="cb20"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb20-1" title="1">conf &lt;-<span class="st"> </span><span class="kw">configureMCMC</span>(Rmodel, <span class="dt">monitors =</span> <span class="kw">c</span>(<span class="st">&quot;phi0&quot;</span>, <span class="st">&quot;beta&quot;</span>, <span class="st">&quot;lambda&quot;</span>), <span class="dt">print =</span> <span class="ot">FALSE</span>)</a>
+<a class="sourceLine" id="cb20-2" title="2">Rmcmc &lt;-<span class="st"> </span><span class="kw">buildMCMC</span>(conf)</a></code></pre></div>
+</div>
+<div id="compile-and-run-mcmc" class="section level3">
+<h3>Compile and Run MCMC</h3>
+<p>Finally, we compile both the model and MCMC objects and execute the compiled MCMC for 5 000 iterations and 3 chains.</p>
+<div class="sourceCode" id="cb21"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb21-1" title="1">Cmodel &lt;-<span class="st"> </span><span class="kw">compileNimble</span>(Rmodel)</a></code></pre></div>
+<pre><code>## compiling... this may take a minute. Use &#39;showCompilerOutput = TRUE&#39; to see C++ compilation details.</code></pre>
+<pre><code>## compilation finished.</code></pre>
+<div class="sourceCode" id="cb24"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb24-1" title="1">Cmcmc &lt;-<span class="st"> </span><span class="kw">compileNimble</span>(Rmcmc, <span class="dt">project =</span> Rmodel)</a></code></pre></div>
+<pre><code>## compiling... this may take a minute. Use &#39;showCompilerOutput = TRUE&#39; to see C++ compilation details.
+## compilation finished.</code></pre>
+<div class="sourceCode" id="cb26"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb26-1" title="1">MCMC_runtime &lt;-<span class="st"> </span><span class="kw">system.time</span>(</a>
+<a class="sourceLine" id="cb26-2" title="2">  samples &lt;-<span class="st"> </span><span class="kw">runMCMC</span>( Cmcmc,</a>
+<a class="sourceLine" id="cb26-3" title="3">                      <span class="dt">niter =</span> <span class="dv">5000</span>,</a>
+<a class="sourceLine" id="cb26-4" title="4">                      <span class="dt">nburnin =</span> <span class="dv">1000</span>,</a>
+<a class="sourceLine" id="cb26-5" title="5">                      <span class="dt">nchains =</span> <span class="dv">3</span>,</a>
+<a class="sourceLine" id="cb26-6" title="6">                      <span class="dt">samplesAsCodaMCMC =</span> T))</a></code></pre></div>
+<pre><code>## running chain 1...</code></pre>
+<pre><code>## |-------------|-------------|-------------|-------------|
+## |-------------------------------------------------------|</code></pre>
+<pre><code>## running chain 2...</code></pre>
+<pre><code>## |-------------|-------------|-------------|-------------|
+## |-------------------------------------------------------|</code></pre>
+<pre><code>## running chain 3...</code></pre>
+<pre><code>## |-------------|-------------|-------------|-------------|
+## |-------------------------------------------------------|</code></pre>
+</div>
+</div>
+<div id="results" class="section level2">
+<h2>Results</h2>
+<p>First, we can look at a summary of the posterior distributions for each parameter:</p>
+<div class="sourceCode" id="cb33"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb33-1" title="1"><span class="kw">summary</span>(samples)</a></code></pre></div>
+<pre><code>## 
+## Iterations = 1:4000
+## Thinning interval = 1 
+## Number of chains = 3 
+## Sample size per chain = 4000 
+## 
+## 1. Empirical mean and standard deviation for each variable,
+##    plus standard error of the mean:
+## 
+##               Mean       SD  Naive SE Time-series SE
+## beta[1]  5.842e-05 0.001711 1.562e-05      0.0001543
+## beta[2] -9.767e-03 0.002401 2.191e-05      0.0003141
+## lambda   4.463e-01 0.005622 5.132e-05      0.0001274
+## phi0[1]  9.701e-01 0.004332 3.955e-05      0.0003912
+## phi0[2]  9.742e-01 0.005696 5.200e-05      0.0007159
+## 
+## 2. Quantiles for each variable:
+## 
+##              2.5%       25%       50%       75%     97.5%
+## beta[1] -0.003236 -0.001123  0.000108  0.001255  0.003345
+## beta[2] -0.014462 -0.011421 -0.009826 -0.008082 -0.005134
+## lambda   0.435678  0.442347  0.446259  0.450063  0.457502
+## phi0[1]  0.960919  0.967207  0.970305  0.973163  0.977613
+## phi0[2]  0.961473  0.970636  0.974843  0.978295  0.983663</code></pre>
+<p>We can then examine traceplots and posterior distribution densities:</p>
+<div class="sourceCode" id="cb35"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb35-1" title="1"><span class="co">#plot(samples)</span></a>
+<a class="sourceLine" id="cb35-2" title="2">basicMCMCplots<span class="op">::</span><span class="kw">chainsPlot</span>(samples)</a></code></pre></div>
+<p><img src="data:image/png;base64,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" /><!-- --></p>
+<p>We can also extract the MCMC runtime (10.9 minutes in this case):</p>
+<div class="sourceCode" id="cb36"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb36-1" title="1"><span class="kw">round</span>(MCMC_runtime[<span class="dv">3</span>] <span class="op">/</span><span class="st"> </span><span class="dv">60</span>, <span class="dv">1</span>)</a></code></pre></div>
+<pre><code>## elapsed 
+##    10.9</code></pre>
+<p>And check the posterior effective sample size (ESS) resulting from our 15 000 posterior samples for the parameters we tracked ( <span class="math inline">\(\phi_0\)</span>, <span class="math inline">\(\beta\)</span> and <span class="math inline">\(\lambda\)</span>):</p>
+<div class="sourceCode" id="cb38"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb38-1" title="1"><span class="kw">round</span>(<span class="kw">effectiveSize</span>(samples),<span class="dv">2</span>) </a></code></pre></div>
+<pre><code>## beta[1] beta[2]  lambda phi0[1] phi0[2] 
+##  130.65   59.31 1981.00  129.25   64.82</code></pre>
+<p>Finally, we can calculate the MCMC efficiency for each parameter; this corresponds to the rate of generating effectively independent posterior samples, per second of MCMC runtime:</p>
+<div class="sourceCode" id="cb40"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb40-1" title="1"> <span class="kw">round</span>(<span class="kw">effectiveSize</span>(samples)<span class="op">/</span>MCMC_runtime[<span class="dv">3</span>],<span class="dv">2</span>)  </a></code></pre></div>
+<pre><code>## beta[1] beta[2]  lambda phi0[1] phi0[2] 
+##    0.20    0.09    3.03    0.20    0.10</code></pre>
+</div>
+
+
+
+<!-- code folding -->
+
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>
