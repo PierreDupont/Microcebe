@@ -23,13 +23,13 @@ source("workingDirectories.R")
 ## ------   1. Individual captures ------
 ##-- Load individual captures data 
 capture_data <- read.csv(file.path(dataDir, "cmr_mhc_input_data_microcebus.csv"),
-                        row.names = 1, header = TRUE)
+                         row.names = 1, header = TRUE)
 
 ##-- Remove duplicates from the capture data
 capture_data <- capture_data[!duplicated(capture_data[ ]),] %>% droplevels()
 
 ##-- Subset to fragment M13
-m13 <- capture_data[capture_data$site == "M13", ]
+m13 <- capture_data[capture_data$site == "M16", ]
 
 ##-- Format dates
 m13$date <- as.POSIXct(strptime(m13$date, "%m/%d/%Y"))
@@ -41,7 +41,7 @@ capture_sessions <- read.csv(file.path(dataDir, "sessions_dates_sites.csv"),h=T)
 names(capture_sessions) <- c("start.date", "end.date", "site")
 
 ##-- Subset to fragment M13
-sess13 <- capture_sessions[capture_sessions$site == "M13", ]
+sess13 <- capture_sessions[capture_sessions$site == "M16", ]
 
 ##-- Format dates
 sess13$end.date <- as.POSIXct(strptime(sess13$end.date, "%m/%d/%Y"))
@@ -263,7 +263,7 @@ MCMC_runtime <- system.time(
                         nchains = 3,
                         thin = 5,
                         samplesAsCodaMCMC = T)
-  )
+)
 plot(nimOutput)
 
 
