@@ -17,7 +17,6 @@ library(nimble)
 ## ------ WORKING DIRECTORIES ------
 source("workingDirectories.R")
 
-## ------ 
 
 ## -----------------------------------------------------------------------------
 ## ------ I. LOAD & CLEAN DATA ------
@@ -27,13 +26,17 @@ capture_data <- read.csv(file.path(dataDir, "cmr_mhc_input_data_microcebus.csv")
                          row.names = 1, header = TRUE)
 
 ##-- Remove duplicates from the capture data
-capture_data <- capture_data[!duplicated(capture_data[ ]),] %>% droplevels()
+capture_data <- capture_data[!duplicated(capture_data[ ]), ] %>% droplevels()
 
-##-- Subset to fragment M13
-m13 <- capture_data[capture_data$site == "M16", ]
+##-- Remove individuals without ID
+capture_data <- capture_data[!is.na(capture_data$transponder), ] %>% droplevels()
+capture_data <- capture_data[!(capture_data$transponder == ""), ] %>% droplevels()
+capture_data <- capture_data[!(capture_data$transponder == "//"), ] %>% droplevels()
+capture_data <- capture_data[!(capture_data$transponder == "/?/"), ] %>% droplevels()
 
 ##-- Format dates
-m13$date <- as.POSIXct(strptime(m13$date, "%m/%d/%Y"))
+capture_data$date <- as.POSIXct(strptime(capture_data$date, "%m/%d/%Y"))
+
 
 
 ## ------   2. Capture sessions ------
@@ -41,134 +44,158 @@ m13$date <- as.POSIXct(strptime(m13$date, "%m/%d/%Y"))
 capture_sessions <- read.csv(file.path(dataDir, "sessions_dates_sites.csv"),h=T)
 names(capture_sessions) <- c("start.date", "end.date", "site")
 
-##-- Subset to fragment M13
-sess13 <- capture_sessions[capture_sessions$site == "M16", ]
-
 ##-- Format dates
-sess13$end.date <- as.POSIXct(strptime(sess13$end.date, "%m/%d/%Y"))
-sess13$start.date <- as.POSIXct(strptime(sess13$start.date, "%m/%d/%Y"))
+capture_sessions$end.date <- as.POSIXct(strptime(capture_sessions$end.date, "%m/%d/%Y"))
+capture_sessions$start.date <- as.POSIXct(strptime(capture_sessions$start.date, "%m/%d/%Y"))
 
 ##-- Identify start months and years
-sess13$start.year <- as.numeric(format(sess13$start.date,"%Y"))
-sess13$start.month <- as.numeric(format(sess13$start.date,"%m"))
+capture_sessions$start.year <- as.numeric(format(capture_sessions$start.date,"%Y"))
+capture_sessions$start.month <- as.numeric(format(capture_sessions$start.date,"%m"))
 
 ##-- Calculate the duration of each capture session
-sess13$duration <- difftime(time1 = sess13$end.date,
-                            time2 = sess13$start.date,
+capture_sessions$duration <- difftime(time1 = capture_sessions$end.date,
+                            time2 = capture_sessions$start.date,
                             units = "days") 
-sess13$duration <- as.numeric(sess13$duration + 1) ## because at least one day of capture
+capture_sessions$duration <- as.numeric(capture_sessions$duration + 1) ## because at least one day of capture
 
 ##-- Aggregate capture sessions that happened in the same month
-startAggSessions <- aggregate(start.date ~ start.month + start.year, data = sess13, FUN = min)
-endAggSessions <- aggregate(end.date ~ start.month + start.year, data = sess13, FUN = max)
-durationAggSessions <- aggregate(duration ~ start.month + start.year, data = sess13, FUN = sum)
-sess13 <- merge(startAggSessions, endAggSessions, by = c("start.month", "start.year"))
-sess13 <- merge(sess13, durationAggSessions, by = c("start.month", "start.year"))
+startAggSessions <- aggregate(start.date ~ start.month + start.year + site, 
+                              data = capture_sessions, FUN = min)
+endAggSessions <- aggregate(end.date ~ start.month + start.year + site,
+                            data = capture_sessions, FUN = max)
+durationAggSessions <- aggregate(duration ~ start.month + start.year + site,
+                                 data = capture_sessions, FUN = sum)
+aggSessions <- merge( startAggSessions, endAggSessions,
+                 by = c("start.month", "start.year", "site"))
+aggSessions <- merge( aggSessions, durationAggSessions,
+                 by = c("start.month", "start.year", "site"))
 
-##-- Ensure sessions are ordered by start.date
-sess13 <- sess13[order(sess13$start.date), ]
 
-##-- Give an index to each capture session
-sess13$index <- 1:nrow(sess13)
+## ------   3. Clean data for each fragment ------
+fragments <- unique(capture_data$site)
+minYear <- min(capture_sessions$start.year)
+minMonth <- min(capture_sessions$start.month[capture_sessions$start.year == minYear])
 
-##-- Identify end months and years of each aggregated capture session
-sess13$end.year <- as.numeric(format(sess13$end.date,"%Y"))
-sess13$end.month <- as.numeric(format(sess13$end.date,"%m"))
-n.sessions <- nrow(sess13)
+data_list <- list()
+for(f in 1:length(fragments)){
+  data_list[[f]] <- list()
+  ##-- Subset to fragment "s"
+  print(fragments[f])
+  thisData <- capture_data[capture_data$site == fragments[f], ]
+  thisSessions <- capture_sessions[capture_sessions$site == fragments[f], ]
+  
+  ##-- Ignore fragments with less than 2 sessions 
+  if(dim(thisSessions)[1] < 2){next}
+  
+  ##-- Ensure sessions are ordered by start.date
+  thisSessions <- thisSessions[order(thisSessions$start.date), ]
+  
+  ##-- Give an index to each capture session
+  thisSessions$index <- 1:nrow(thisSessions)
+  
+  ##-- Identify end months and years of each aggregated capture session
+  thisSessions$end.year <- as.numeric(format(thisSessions$end.date, "%Y"))
+  thisSessions$end.month <- as.numeric(format(thisSessions$end.date, "%m"))
+  
+  ##-- Store number of sessions for this fragment
+  n.sessions <- nrow(thisSessions)
+  data_list[[f]]$n.sessions <- n.sessions
+  
+  ##-- Calculate months index of each capture session
+  for(s in 1:n.sessions){
+    thisSessions$start.month.index[s] <- (thisSessions$start.year[s]-minYear)*12 +
+      thisSessions$start.month[s] - minMonth  + 1
+    thisSessions$end.month.index[s] <- (thisSessions$end.year[s]-minYear)*12 +
+      thisSessions$end.month[s] - minMonth + 1
+  }#s
+  
+  ##-- Calculate range of years covered by the study in this fragment
+  years <- minYear:max(thisSessions$start.year)
+  data_list[[f]]$years <- years
+  data_list[[f]]$n.years <- length(years)
+  
+  ##-- Calculate range of months covered by the study in this fragment
+  data_list[[f]]$months <- 1:max(thisSessions$start.month.index)
+  data_list[[f]]$n.months <- length(months)-1
 
-##-- Calculate months index of each capture session
-minYear <- min(sess13$start.year)
-minMonth <- min(sess13$start.month[sess13$start.year == minYear])
-for(s in 1:n.sessions){
-  sess13$start.month.index[s] <- (sess13$start.year[s]-minYear)*12 +
-    sess13$start.month[s] - minMonth  + 1
-  sess13$end.month.index[s] <- (sess13$end.year[s]-minYear)*12 +
-    sess13$end.month[s] - minMonth + 1
-}#s
+  
+  
+  ## ---------------------------------------------------------------------------
+  ## ------ II. CREATE CAPTURE HISTORY ------
+  ##-- Identify in which session each individual was captured
+  for(c in 1:nrow(thisData)){
+    temp <- thisSessions$index[thisSessions$start.date <= thisData$date[c] &
+                                 thisSessions$end.date >= thisData$date[c]]
+    thisData$session[c] <- ifelse(length(temp) == 0, NA, temp)
+  }#c
+  
+  ##-- Create a dummy dataset
+  dummy <- data.frame( transponder  = "dummy",
+                       session = thisSessions$index)
+  
+  ##-- Combine real and dummy datasets
+  thisData.dummy <- rbind.fill(thisData, dummy)
+  
+  ##-- Create the matrix of capture history
+  thisCH <- table(thisData.dummy$transponder, thisData.dummy$session)
+  
+  ##-- Remove dummy individual
+  thisCH <- thisCH[-which(dimnames(thisCH)[[1]] == "dummy"), ] 
+  
+  ##-- Extract the first detection session for each individual
+  first <- apply(thisCH, 1, function(x)min(which(x >= 1)))
+  
+  ##-- Remove individuals detected for the first time on the last session
+  #thisCH <- thisCH[which(first != dim(thisCH)[2]), ]
+  #data_list[[f]]$f <- first[which(first != dim(thisCH)[2])]
+  
+  ##-- Reorder and turn into a matrix
+  thisCH <- thisCH[order(dimnames(thisCH)[[1]]), ]
+  thisCH <- as.matrix(thisCH)
+  thisCH[thisCH > 0] <- 1
+  data_list[[f]]$CH <- thisCH
+  dim(thisCH)
+  
+  ##-- List individuals
+  ids <- dimnames(thisCH)[[1]] 
+  data_list[[f]]$ids <- ids
+  data_list[[f]]$n.individuals <- length(ids)
+  
+  ##-- Sex
+  sex <- unique(thisData[thisData$transponder %in% ids, c("transponder", "Sexe")])
+  sex <- sex[order(sex$transponder), ] 
+  all(dimnames(thisCH)[[1]] == sex$transponder)
+  data_list[[f]]$sex <- ifelse(sex$Sexe == "f", 1, 2) 
+  
+  ##-- Age 
+  # age <- matrix(data = NA, nrow = n.individuals, ncol = n.sessions)
+  # for(i in ids){
+  #   for(s in thisSessions$index){
+  #     temp <- thisData[thisData$transponder == i & thisData$session == s, ]
+  #     if(length(temp) != 0){ age[i,s] <- unique(temp$age_estimation_2) }
+  #   }
+  # }
+  
+  ##-- Interval lengths between capture sessions
+  data_list[[f]]$start.int <- data_list[[f]]$end.int <- NULL
+  for(i in 1:(n.sessions-1)){
+    data_list[[f]]$start.int[i] <- thisSessions$start.month.index[i]
+    data_list[[f]]$end.int[i] <- thisSessions$start.month.index[i+1]-1
+  }#t
+  
+  ##-- Check the data with plots
+  hist(rowSums(thisCH))                       ## num. of detections per id
+  plot(thisSessions$duration, colSums(thisCH))## num. of ids detected per session duration
+}#f
 
-##-- Calculate range of years covered by the study
-years <- minYear:max(sess13$start.year)
-n.years <- length(years)
 
-##-- Calculate range of months covered by the study 
-months <- 1:max(sess13$start.month.index)
-n.months <- length(months)-1
 
 ##-- Identify seasons for each month of the study
 # Wet season from October until June!
 season <- rep(c(1,1,1,1,1,1,2,2,2,1,1,1), n.years)
 season <- season[minMonth:(n.months+minMonth-1)]
 
-
-## -----------------------------------------------------------------------------
-## ------ II. CREATE CAPTURE HISTORY ------
-##-- Identify in which session each individual was captured
-for(c in 1:nrow(m13)){
-  m13$session[c] <- sess13$index[sess13$start.date <= m13$date[c] & sess13$end.date >= m13$date[c]]
-}#c
-
-##-- Create a dummy dataset
-dummy <- data.frame( transponder  = "dummy",
-                     session = sess13$index)
-
-##-- Combine real and dummy datasets
-m13.dummy <- rbind.fill(m13, dummy)
-
-##-- Create the matrix of capture history
-ch13 <- table(m13.dummy$transponder, m13.dummy$session)
-
-##-- Remove dummy individual
-ch13 <- ch13[-which(dimnames(ch13)[[1]] == "dummy"), ] 
-
-##-- Extract the first detection session for each individual
-f <- apply(ch13, 1, function(x)min(which(x >= 1)))
-
-##-- Remove individuals detected for the first time on the last session
-ch13 <- ch13[which(f != dim(ch13)[2]), ]
-f <- f[which(f != dim(ch13)[2])]
-
-##-- Reorder and turn into a matrix
-ch13 <- ch13[order(dimnames(ch13)[[1]]), ]
-ch13 <- as.matrix(ch13)
-ch13[ch13 > 0] <- 1
-dim(ch13)
-
-##-- List individuals
-ids <- dimnames(ch13)[[1]] 
-n.individuals <- length(ids)
-
-##-- Sex
-sex <- unique(m13[m13$transponder %in% ids, c("transponder", "Sexe")])
-sex <- sex[order(sex$transponder), ] 
-all(dimnames(ch13)[[1]] == sex$transponder)
-sex <- ifelse(sex$Sexe == "f", 1, 2) 
-
-
-# ##-- Age 
-# age <- matrix(data = NA, nrow = n.individuals, ncol = n.sessions)
-# for(i in ids){
-#   for(s in sess13$index){
-#     temp <- m13[m13$transponder == i & m13$session == s, ]
-#     if(length(temp) != 0){
-#       age[i,s] <- unique(temp$age_estimation_2)
-#     }
-#   }
-# }
-
-##-- Interval lengths between capture sessions
-start.int <- end.int <- NULL
-for(i in 1:(n.sessions-1)){
-  start.int[i] <- sess13$start.month.index[i]
-  end.int[i] <- sess13$start.month.index[i+1]-1
-}#t
-
-
-##-- Check the data with plots
-hist(rowSums(ch13))                  ## num. of detections per individual
-plot(sess13$duration, colSums(ch13)) ## num. of ids detected per session duration
-
-
-
+data_list[[6]]
 ## -----------------------------------------------------------------------------
 ## ------ III. NIMBLE MODEL ,------
 ##-- Write the CR model in NIMBLE
@@ -211,12 +238,12 @@ nimModel <- nimbleCode({
 })
 
 ##-- Format the data for NIMBLE
-nimData <- list( y = ch13,
+nimData <- list( y = thisCH,
                  sessionDuration = sess13$duration)
 
-nimConstants <- list( n.individuals = dim(ch13)[1],
-                      n.intervals = dim(ch13)[2]-1,
-                      n.sessions = dim(ch13)[2],
+nimConstants <- list( n.individuals = dim(thisCH)[1],
+                      n.intervals = dim(thisCH)[2]-1,
+                      n.sessions = dim(thisCH)[2],
                       n.months = n.months,
                       season = season,
                       f = f,
