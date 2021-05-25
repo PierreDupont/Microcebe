@@ -17,6 +17,7 @@ library(nimble)
 ## ------ WORKING DIRECTORIES ------
 source("workingDirectories.R")
 
+## ------ 
 
 ## -----------------------------------------------------------------------------
 ## ------ I. LOAD & CLEAN DATA ------
@@ -169,7 +170,7 @@ plot(sess13$duration, colSums(ch13)) ## num. of ids detected per session duratio
 
 
 ## -----------------------------------------------------------------------------
-## ------ III. NIMBLE MODEL ------
+## ------ III. NIMBLE MODEL ,------
 ##-- Write the CR model in NIMBLE
 nimModel <- nimbleCode({
   ## DEMOGRAPHIC PROCESS 
@@ -250,7 +251,7 @@ Rmodel$calculate()
 ##-- Configure and Build MCMC objects
 conf <- configureMCMC(Rmodel, monitors = c("phi0", "beta", "lambda"), print = FALSE)
 Rmcmc <- buildMCMC(conf)
-
+23,,
 ##-- Compile and Run MCMC
 ## Finally, we compile both the model and MCMC objects and execute the compiled 
 ## MCMC for 50 000 iterations and 3 chains.
@@ -265,7 +266,8 @@ MCMC_runtime <- system.time(
                         samplesAsCodaMCMC = T)
 )
 plot(nimOutput)
-
+save(nimOutput, MCMC_runtime,
+     file = file.path(analysisDir, "m16.RData"))
 
 ## -----------------------------------------------------------------------------
 ## For recruitment, take the approach of N.Hostetter
