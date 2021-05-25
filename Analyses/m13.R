@@ -173,37 +173,44 @@ plot(sess13$duration, colSums(ch13)) ## num. of ids detected per session duratio
 ##-- Write the CR model in NIMBLE
 nimModel <- nimbleCode({
   ## DEMOGRAPHIC PROCESS 
-  phi0[1] ~ dunif(0,1)
-  phi0[2] ~ dunif(0,1)
-  logit.phi0[1] <- logit(phi0[1])
-  logit.phi0[2] <- logit(phi0[2])
-  beta ~ dnorm(0,0.01)
+  phi0[1,1] ~ dunif(0,1)
+  phi0[2,1] ~ dunif(0,1)
+  phi0[1,2] ~ dunif(0,1)
+  phi0[2,2] ~ dunif(0,1)
+  
+  beta[1] ~ dnorm(0,0.01)
+  beta[2] ~ dnorm(0,0.01)
+  
   for(m in 1:n.months){
-    logit(PHI[m]) <- logit.phi0[season[m]] + beta * m
+    logit(PHI[m,1]) <- logit(phi0[season[m],1]) + beta[1] * m
+    logit(PHI[m,2]) <- logit(phi0[season[m],2]) + beta[2] * m
   }# months
   
   for(t in 1:n.intervals){
-    phi[t] <- prod(PHI[start.int[t]:end.int[t]])
+    phi[t,1] <- prod(PHI[start.int[t]:end.int[t],1])
+    phi[t,2] <- prod(PHI[start.int[t]:end.int[t],2])
   }# time
   
   for(i in 1:n.individuals){
     z[i,f[i]] ~ dbern(1)  
     for(t in f[i]:n.intervals){
-      z[i,t+1] ~ dbern(z[i,t] * phi[t])  
+      z[i,t+1] ~ dbern(z[i,t] * phi[t,sex[i]])  
     }#t
   }#i
   
   ## DETECTION PROCESS
   ## Detection Hazard rate
-  lambda ~ dunif(0,5)                   
+  lambda[1] ~ dunif(0,5)  
+  lambda[2] ~ dunif(0,5)                   
   for(t in 1:n.sessions){
     ## Allows for unequal sampling sessions (sessionDuration[t])
-    p[t] <- 1-exp(-lambda * sessionDuration[t]) 
+    p[t,1] <- 1-exp(-lambda[1] * sessionDuration[t]) 
+    p[t,2] <- 1-exp(-lambda[2] * sessionDuration[t]) 
   }# session
   
   for(i in 1:n.individuals){
     for(t in (f[i]+1):n.sessions){
-      y[i,t] ~ dbern(p[t] * z[i,t])
+      y[i,t] ~ dbern(p[t,sex[i]] * z[i,t])
     }#t
   }#i
   
@@ -218,6 +225,7 @@ nimConstants <- list( n.individuals = dim(ch13)[1],
                       n.sessions = dim(ch13)[2],
                       n.months = n.months,
                       season = season,
+                      sex = sex,
                       f = f,
                       start.int = start.int,
                       end.int = end.int)
@@ -234,9 +242,9 @@ for(i in 1:dim(z.init)[1]){
   }
 }#i
 nimInits <- list( z = z.init,
-                  phi0 = c(0.85,0.85),
-                  beta = c(0),
-                  lambda = 0.5)
+                  phi0 = matrix(rep(0.85,4), ncol = 2),
+                  beta = c(0,0),
+                  lambda = c(0.2,0.2))
 
 
 ##-- Create a NIMBLE model object
