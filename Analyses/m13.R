@@ -12,6 +12,7 @@ library(purrr)
 library(plyr)
 library(coda)
 library(nimble)
+library(MCMCvis)
 
 
 ## ------ WORKING DIRECTORIES ------
@@ -273,6 +274,11 @@ MCMC_runtime <- system.time(
                         samplesAsCodaMCMC = T)
   )
 plot(nimOutput)
+
+MCMCtrace(nimOutput, 
+          pdf = TRUE, 
+          open_pdf = TRUE, 
+          filename = 'M13')
 
 
 ## -----------------------------------------------------------------------------

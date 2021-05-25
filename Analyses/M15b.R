@@ -258,7 +258,7 @@ Rmodel <- nimbleModel( code = nimModel,
                        inits = nimInits,
                        calculate = F)
 Rmodel$calculate()
-
+###This model is not fully initialized. This is not an error. To see which variables are not initialized, use model$initializeInfo().
 ##-- Configure and Build MCMC objects
 conf <- configureMCMC(Rmodel, monitors = c("phi0", "beta", "lambda"), print = FALSE)
 Rmcmc <- buildMCMC(conf)
