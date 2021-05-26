@@ -33,6 +33,9 @@ capture_data <- capture_data[!duplicated(capture_data[ ]),] %>% droplevels()
 ##-- Subset to fragment m16
 m16 <- capture_data[capture_data$site %in% c("M16", "M16 Vao"), ]
 
+#-- Remove non marked individuals
+m16 <- m16[!(m16$transponder %in% "//"),]
+
 ##-- Format dates
 m16$date <- as.POSIXct(strptime(m16$date, "%m/%d/%Y"))
 
@@ -279,7 +282,8 @@ plot(nimOutput)
 MCMCtrace(nimOutput, 
           pdf = TRUE, 
           open_pdf = TRUE, 
-          filename = 'M16')
+          filename = 'M16',
+          wd="C:/Users/anvargas/Dropbox/Mouse lemur CMR data/06_Results/01_Model fragment")
 
 ## -----------------------------------------------------------------------------
 ## -----------------------------------------------------------------------------
