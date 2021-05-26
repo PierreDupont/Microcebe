@@ -1,6 +1,6 @@
 #######################################################
 ##### ------------ MANDENA MICROCEBE ------------ #####
-##### -- PRELIMINARY ANALYSIS for FRAGMENT M20 -- #####
+##### -- PRELIMINARY ANALYSIS for FRAGMENT M15b -- #####
 #######################################################
 rm(list = ls())
 
@@ -281,7 +281,8 @@ plot(nimOutput)
 MCMCtrace(nimOutput, 
           pdf = TRUE, 
           open_pdf = TRUE, 
-          filename = 'M15b')
+          filename = 'M15b',
+          wd="C:/Users/anvargas/Dropbox/Mouse lemur CMR data/06_Results/01_Model fragment")
 
 
 ## -----------------------------------------------------------------------------

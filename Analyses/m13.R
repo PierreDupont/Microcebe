@@ -278,7 +278,8 @@ plot(nimOutput)
 MCMCtrace(nimOutput, 
           pdf = TRUE, 
           open_pdf = TRUE, 
-          filename = 'M13')
+          filename = 'M13',
+          wd="C:/Users/anvargas/Dropbox/Mouse lemur CMR data/06_Results/01_Model fragment")
 
 
 ## -----------------------------------------------------------------------------

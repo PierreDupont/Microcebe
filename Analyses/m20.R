@@ -12,6 +12,7 @@ library(purrr)
 library(plyr)
 library(coda)
 library(nimble)
+library(MCMCvis)
 
 
 ## ------ WORKING DIRECTORIES ------
@@ -30,6 +31,10 @@ capture_data <- capture_data[!duplicated(capture_data[ ]),] %>% droplevels()
 
 ##-- Subset to fragment M20
 m20 <- capture_data[capture_data$site == "M20", ]
+unique(m20$transponder)
+#-- Remove non marked individuals too
+m20 <- m20[!(m20$transponder %in% "//"),]
+
 
 ##-- Format dates
 m20$date <- as.POSIXct(strptime(m20$date, "%m/%d/%Y"))
@@ -56,6 +61,8 @@ sess20$duration <- difftime(time1 = sess20$end.date,
                             time2 = sess20$start.date,
                             units = "days") 
 sess20$duration <- as.numeric(sess20$duration + 1) ## because at least one day of capture
+
+length(sess20$duration)
 
 ##-- Aggregate capture sessions that happened in the same month
 startAggSessions <- aggregate(start.date ~ start.month + start.year, data = sess20, FUN = min)
@@ -102,6 +109,7 @@ season <- season[minMonth:(n.months+minMonth-1)]
 ## -----------------------------------------------------------------------------
 ## ------ II. CREATE CAPTURE HISTORY ------
 ##-- Identify in which session each individual was captured
+c=1
 for(c in 1:nrow(m20)){
   m20$session[c] <- sess20$index[sess20$start.date <= m20$date[c] & sess20$end.date >= m20$date[c]]
 }#c
@@ -274,5 +282,9 @@ MCMC_runtime <- system.time(
 )
 plot(nimOutput)
 
-
+MCMCtrace(nimOutput, 
+          pdf = TRUE, 
+          open_pdf = TRUE, 
+          filename = 'M20',
+          wd="C:/Users/anvargas/Dropbox/Mouse lemur CMR data/06_Results/01_Model fragment")
 ## -----------------------------------------------------------------------------

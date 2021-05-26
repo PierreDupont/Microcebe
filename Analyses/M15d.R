@@ -1,6 +1,6 @@
 #######################################################
 ##### ------------ MANDENA MICROCEBE ------------ #####
-##### -- PRELIMINARY ANALYSIS for FRAGMENT M15c -- #####
+##### -- PRELIMINARY ANALYSIS for FRAGMENT M15d -- #####
 #######################################################
 rm(list = ls())
 
@@ -29,14 +29,15 @@ capture_data <- read.csv(file.path(dataDir, "cmr_mhc_input_data_microcebus.csv")
 ##-- Remove duplicates from the capture data
 capture_data <- capture_data[!duplicated(capture_data[ ]),] %>% droplevels()
 
-##-- Subset to fragment M15c
-m15c <- capture_data[capture_data$site == "M15c", ]
+##-- Subset to fragment M15d
+m15d <- capture_data[capture_data$site == "M15d", ]
+unique(m15d$transponder)
+#-- Remove non marked individuals too
+m15d <- m15d[!(m15d$transponder %in% "//"),]
 
-##-- Remove non marked individuals too
-m15c <- m15c[!(m15c$transponder %in% "//"),]
 
 ##-- Format dates
-m15c$date <- as.POSIXct(strptime(m15c$date, "%m/%d/%Y"))
+m15d$date <- as.POSIXct(strptime(m15d$date, "%m/%d/%Y"))
 
 
 ## ------   2. Capture sessions ------
@@ -44,57 +45,59 @@ m15c$date <- as.POSIXct(strptime(m15c$date, "%m/%d/%Y"))
 capture_sessions <- read.csv(file.path(dataDir, "sessions_dates_sites.csv"),h=T)
 names(capture_sessions) <- c("start.date", "end.date", "site")
 
-##-- Subset to fragment M15c
-sess15c <- capture_sessions[capture_sessions$site == "M15c", ]
+##-- Subset to fragment M15d
+sess15d <- capture_sessions[capture_sessions$site == "M15d", ]
 
 ##-- Format dates
-sess15c$end.date <- as.POSIXct(strptime(sess15c$end.date, "%m/%d/%Y"))
-sess15c$start.date <- as.POSIXct(strptime(sess15c$start.date, "%m/%d/%Y"))
+sess15d$end.date <- as.POSIXct(strptime(sess15d$end.date, "%m/%d/%Y"))
+sess15d$start.date <- as.POSIXct(strptime(sess15d$start.date, "%m/%d/%Y"))
 
 ##-- Identify start months and years
-sess15c$start.year <- as.numeric(format(sess15c$start.date,"%Y"))
-sess15c$start.month <- as.numeric(format(sess15c$start.date,"%m"))
+sess15d$start.year <- as.numeric(format(sess15d$start.date,"%Y"))
+sess15d$start.month <- as.numeric(format(sess15d$start.date,"%m"))
 
 ##-- Calculate the duration of each capture session
-sess15c$duration <- difftime(time1 = sess15c$end.date,
-                             time2 = sess15c$start.date,
-                             units = "days") 
-sess15c$duration <- as.numeric(sess15c$duration + 1) ## because at least one day of capture
+sess15d$duration <- difftime(time1 = sess15d$end.date,
+                            time2 = sess15d$start.date,
+                            units = "days") 
+sess15d$duration <- as.numeric(sess15d$duration + 1) ## because at least one day of capture
+
+length(sess15d$duration)
 
 ##-- Aggregate capture sessions that happened in the same month
-startAggSessions <- aggregate(start.date ~ start.month + start.year, data = sess15c, FUN = min)
-endAggSessions <- aggregate(end.date ~ start.month + start.year, data = sess15c, FUN = max)
-durationAggSessions <- aggregate(duration ~ start.month + start.year, data = sess15c, FUN = sum)
-sess15c <- merge(startAggSessions, endAggSessions, by = c("start.month", "start.year"))
-sess15c <- merge(sess15c, durationAggSessions, by = c("start.month", "start.year"))
+startAggSessions <- aggregate(start.date ~ start.month + start.year, data = sess15d, FUN = min)
+endAggSessions <- aggregate(end.date ~ start.month + start.year, data = sess15d, FUN = max)
+durationAggSessions <- aggregate(duration ~ start.month + start.year, data = sess15d, FUN = sum)
+sess15d <- merge(startAggSessions, endAggSessions, by = c("start.month", "start.year"))
+sess15d <- merge(sess15d, durationAggSessions, by = c("start.month", "start.year"))
 
 ##-- Ensure sessions are ordered by start.date
-sess15c <- sess15c[order(sess15c$start.date), ]
+sess15d <- sess15d[order(sess15d$start.date), ]
 
 ##-- Give an index to each capture session
-sess15c$index <- 1:nrow(sess15c)
+sess15d$index <- 1:nrow(sess15d)
 
 ##-- Identify end months and years of each aggregated capture session
-sess15c$end.year <- as.numeric(format(sess15c$end.date,"%Y"))
-sess15c$end.month <- as.numeric(format(sess15c$end.date,"%m"))
-n.sessions <- nrow(sess15c)
+sess15d$end.year <- as.numeric(format(sess15d$end.date,"%Y"))
+sess15d$end.month <- as.numeric(format(sess15d$end.date,"%m"))
+n.sessions <- nrow(sess15d)
 
 ##-- Calculate months index of each capture session
-minYear <- min(sess15c$start.year)
-minMonth <- min(sess15c$start.month[sess15c$start.year == minYear])
+minYear <- min(sess15d$start.year)
+minMonth <- min(sess15d$start.month[sess15d$start.year == minYear])
 for(s in 1:n.sessions){
-  sess15c$start.month.index[s] <- (sess15c$start.year[s]-minYear)*12 +
-    sess15c$start.month[s] - minMonth  + 1
-  sess15c$end.month.index[s] <- (sess15c$end.year[s]-minYear)*12 +
-    sess15c$end.month[s] - minMonth + 1
+  sess15d$start.month.index[s] <- (sess15d$start.year[s]-minYear)*12 +
+    sess15d$start.month[s] - minMonth  + 1
+  sess15d$end.month.index[s] <- (sess15d$end.year[s]-minYear)*12 +
+    sess15d$end.month[s] - minMonth + 1
 }#s
 
 ##-- Calculate range of years covered by the study
-years <- minYear:max(sess15c$start.year)
+years <- minYear:max(sess15d$start.year)
 n.years <- length(years)
 
 ##-- Calculate range of months covered by the study 
-months <- 1:max(sess15c$start.month.index)
+months <- 1:max(sess15d$start.month.index)
 n.months <- length(months)-1
 
 ##-- Identify seasons for each month of the study
@@ -106,52 +109,53 @@ season <- season[minMonth:(n.months+minMonth-1)]
 ## -----------------------------------------------------------------------------
 ## ------ II. CREATE CAPTURE HISTORY ------
 ##-- Identify in which session each individual was captured
-for(c in 1:nrow(m15c)){
-  m15c$session[c] <- sess15c$index[sess15c$start.date <= m15c$date[c] & sess15c$end.date >= m15c$date[c]]
+c=1
+for(c in 1:nrow(m15d)){
+  m15d$session[c] <- sess15d$index[sess15d$start.date <= m15d$date[c] & sess15d$end.date >= m15d$date[c]]
 }#c
 
 ##-- Create a dummy dataset
 dummy <- data.frame( transponder  = "dummy",
-                     session = sess15c$index)
+                     session = sess15d$index)
 
 ##-- Combine real and dummy datasets
-m15c.dummy <- rbind.fill(m15c, dummy)
+m15d.dummy <- rbind.fill(m15d, dummy)
 
 ##-- Create the matrix of capture history
-ch15c <- table(m15c.dummy$transponder, m15c.dummy$session)
+ch15d <- table(m15d.dummy$transponder, m15d.dummy$session)
 
 ##-- Remove dummy individual
-ch15c <- ch15c[-which(dimnames(ch15c)[[1]] == "dummy"), ] 
+ch15d <- ch15d[-which(dimnames(ch15d)[[1]] == "dummy"), ] 
 
 ##-- Extract the first detection session for each individual
-f <- apply(ch15c, 1, function(x)min(which(x >= 1)))
+f <- apply(ch15d, 1, function(x)min(which(x >= 1)))
 
 ##-- Remove individuals detected for the first time on the last session
-ch15c <- ch15c[which(f != dim(ch15c)[2]), ]
-f <- f[which(f != dim(ch15c)[2])]
+ch15d <- ch15d[which(f != dim(ch15d)[2]), ]
+f <- f[which(f != dim(ch15d)[2])]
 
 ##-- Reorder and turn into a matrix
-ch15c <- ch15c[order(dimnames(ch15c)[[1]]), ]
-ch15c <- as.matrix(ch15c)
-ch15c[ch15c > 0] <- 1
-dim(ch15c)
+ch15d <- ch15d[order(dimnames(ch15d)[[1]]), ]
+ch15d <- as.matrix(ch15d)
+ch15d[ch15d > 0] <- 1
+dim(ch15d)
 
 ##-- List individuals
-ids <- dimnames(ch15c)[[1]] 
+ids <- dimnames(ch15d)[[1]] 
 n.individuals <- length(ids)
 
 ##-- Sex
-sex <- unique(m15c[m15c$transponder %in% ids, c("transponder", "Sexe")])
+sex <- unique(m15d[m15d$transponder %in% ids, c("transponder", "Sexe")])
 sex <- sex[order(sex$transponder), ] 
-all(dimnames(ch15c)[[1]] == sex$transponder)
+all(dimnames(ch15d)[[1]] == sex$transponder)
 sex <- ifelse(sex$Sexe == "f", 1, 2) 
 
 
 # ##-- Age 
 # age <- matrix(data = NA, nrow = n.individuals, ncol = n.sessions)
 # for(i in ids){
-#   for(s in sess15c$index){
-#     temp <- m15c[m15c$transponder == i & m15c$session == s, ]
+#   for(s in sess15d$index){
+#     temp <- m15d[m15d$transponder == i & m15d$session == s, ]
 #     if(length(temp) != 0){
 #       age[i,s] <- unique(temp$age_estimation_2)
 #     }
@@ -161,14 +165,14 @@ sex <- ifelse(sex$Sexe == "f", 1, 2)
 ##-- Interval lengths between capture sessions
 start.int <- end.int <- NULL
 for(i in 1:(n.sessions-1)){
-  start.int[i] <- sess15c$start.month.index[i]
-  end.int[i] <- sess15c$start.month.index[i+1]-1
+  start.int[i] <- sess15d$start.month.index[i]
+  end.int[i] <- sess15d$start.month.index[i+1]-1
 }#t
 
 
 ##-- Check the data with plots
-hist(rowSums(ch15c))                  ## num. of detections per individual
-plot(sess15c$duration, colSums(ch15c)) ## num. of ids detected per session duration
+hist(rowSums(ch15d))                  ## num. of detections per individual
+plot(sess15d$duration, colSums(ch15d)) ## num. of ids detected per session duration
 
 
 
@@ -221,12 +225,12 @@ nimModel <- nimbleCode({
 })
 
 ##-- Format the data for NIMBLE
-nimData <- list( y = ch15c,
-                 sessionDuration = sess15c$duration)
+nimData <- list( y = ch15d,
+                 sessionDuration = sess15d$duration)
 
-nimConstants <- list( n.individuals = dim(ch15c)[1],
-                      n.intervals = dim(ch15c)[2]-1,
-                      n.sessions = dim(ch15c)[2],
+nimConstants <- list( n.individuals = dim(ch15d)[1],
+                      n.intervals = dim(ch15d)[2]-1,
+                      n.sessions = dim(ch15d)[2],
                       n.months = n.months,
                       season = season,
                       sex = sex,
@@ -258,8 +262,6 @@ Rmodel <- nimbleModel( code = nimModel,
                        inits = nimInits,
                        calculate = F)
 Rmodel$calculate()
-### This model is not fully initialized. This is not an error. To see which variables are not initialized, use model$initializeInfo()
-
 
 ##-- Configure and Build MCMC objects
 conf <- configureMCMC(Rmodel, monitors = c("phi0", "beta", "lambda"), print = FALSE)
@@ -283,5 +285,6 @@ plot(nimOutput)
 MCMCtrace(nimOutput, 
           pdf = TRUE, 
           open_pdf = TRUE, 
-          filename = 'M15c',
+          filename = 'M15d',
           wd="C:/Users/anvargas/Dropbox/Mouse lemur CMR data/06_Results/01_Model fragment")
+## -----------------------------------------------------------------------------
