@@ -1,6 +1,6 @@
 #######################################################
 ##### ------------ MANDENA MICROCEBE ------------ #####
-##### -- PRELIMINARY ANALYSIS for FRAGMENT M13 -- #####
+##### PRELIMINARY ANALYSIS for MULTIPLE FRAGMENTS #####
 #######################################################
 rm(list = ls())
 
@@ -38,20 +38,14 @@ capture_data <- capture_data[!(capture_data$transponder == "/?/"), ] %>% droplev
 capture_data$date <- as.POSIXct(strptime(capture_data$date, "%m/%d/%Y"))
 
 ##-- Clean-up fragments names
+capture_data$site <- toupper(capture_data$site)
 unique(capture_data$site)
-capture_data$site[capture_data$site == "M13R"] <- "M13"
-capture_data$site[capture_data$site == "M15A"] <- "M15a"
-capture_data$site[capture_data$site == "M15D"] <- "M15d"
-capture_data$site[capture_data$site == "M15E"] <- "M15e"
-capture_data$site[capture_data$site == "M16 Vao"] <- "M16"
-capture_data$site[capture_data$site == "Bush clearing"] <- "Bush"
-capture_data$site[capture_data$site == "Bush cl"] <- "Bush"
+capture_data$site[capture_data$site == "M16 VAO"] <- "M16"
 
-fragments <- c("M13","M15a","M15b","M15c","M15d","M15e","M16")
-# fragments <- c("M3","M4","M5","M6","M7","M9","M11","M12","M13",
-#                "M15a","M15b","M15c","M15d","M15e","M16","M16_Bakuli","M20",
-#                "Bush clearing","Bush cl","Cage","Mine","Corr  R.","Corr  E.",
-#                "Tokon'ala")
+## Fragments to remove:
+# "M3" "M4" "M6" "M7" "M9" "M11" "M12" "M13R" "M15E" "M16_Bakuli"   
+# "Bush clearing" "Bush cl" "Cage" "Mine" "Corr  R." "Corr  E." "Tokon'ala"             
+fragments <- c("M5","M13","M15A","M15B","M15C","M15D","M16","M20")
 capture_data <- capture_data[capture_data$site %in% fragments, ] 
 
 
@@ -62,18 +56,9 @@ capture_sessions <- read.csv(file.path(dataDir, "sessions_dates_sites.csv"),h=T)
 names(capture_sessions) <- c("start.date", "end.date", "site")
 
 ##-- Clean-up fragments names
+capture_sessions$site <- toupper(capture_sessions$site)
 unique(capture_sessions$site)
-# [1] "M16"                "M3"                 "M15a"               "M4"                
-# [5] "M5"                 "M20"                "M16_Bakuli"         "Corridor"          
-# [9] "M6"                 "M13"                "M1"                 "M15b"              
-# [13] "Bush clearing"      "Cage"               "Mine"               "Corr"              
-# [17] "Corr R."            "M13R"               "Corr R. et M13R"    "M13R et M15E"      
-# [21] "Tokon'ala"          "Corr E."            "Corr M16"           "M16 Vao"           
-# [25] "M15c"               "M15d"               "M7"                 "M12"               
-# [29] "M11"                "M9"                 "Herbarium"          "Salle des graines "
-
-# capture_sessions$site[capture_sessions$site == "M13R et M15E" ] <- "???"
-
+capture_sessions$site[capture_sessions$site == "M16 VAO"] <- "M16"
 capture_sessions[capture_sessions$site %in% fragments, ]
 
 ##-- Format dates
@@ -109,7 +94,9 @@ minYear <- min(capture_sessions$start.year)
 minMonth <- min(capture_sessions$start.month[capture_sessions$start.year == minYear])
 
 data_list <- list()
-for(f in 1:length(fragments)){
+names(data_list) <- fragments
+n.fragments <- length(fragments)
+for(f in 1:n.fragments){
   data_list[[f]] <- list()
   ##-- Subset to fragment "s"
   print(fragments[f])
@@ -137,6 +124,9 @@ for(f in 1:length(fragments)){
     thisSessions$end.month.index[s] <- (thisSessions$end.year[s]-minYear)*12 +
       thisSessions$end.month[s] - minMonth + 1
   }#s
+  data_list[[f]]$start.month.index <- thisSessions$start.month.index
+  data_list[[f]]$end.month.index <- thisSessions$end.month.index
+  data_list[[f]]$duration <- thisSessions$duration 
   
   ##-- Calculate range of years covered by the study in this fragment
   years <- min(thisSessions$start.year):max(thisSessions$start.year)
@@ -158,9 +148,13 @@ for(f in 1:length(fragments)){
                                  thisSessions$end.date >= thisData$date[c]]
     ## [PD]: WARNING!!!
     ## SOME CAPTURES WERE RECORDED OUTSIDE THE OFFICIAL CAPTURE SESSIONS
-    if(length(temp) == 0)stop()
-    thisData$session[c] <- ifelse(length(temp) == 0, NA, temp)
+    #if(length(temp) == 0)stop()
+    thisData$session[c] <- ifelse(length(temp)==0,NA,temp)
   }#c
+  
+  ## Remove detections outside capture sessions
+  if(any(is.na(thisData$session))){print(thisData[is.na(thisData$session), ])}
+  thisData <- thisData[!is.na(thisData$session), ]
   
   ##-- Create a dummy dataset
   dummy <- data.frame( transponder  = "dummy",
@@ -195,10 +189,12 @@ for(f in 1:length(fragments)){
   data_list[[f]]$n.individuals <- length(ids)
   
   ##-- Sex
-  sex <- unique(thisData[thisData$transponder %in% ids, c("transponder","Sexe")])
-  sex <- sex[order(sex$transponder), ] 
-  all(dimnames(thisCH)[[1]] == sex$transponder)
-  data_list[[f]]$sex <- ifelse(sex$Sexe == "f",1,2) 
+  sex <- NULL
+  for(i in 1:length(ids)){
+    sex[i] <- unique(thisData$Sexe[thisData$transponder == ids[i]])
+    if(length(sex[i]) != 1)stop("sex issue")
+    }#i
+  data_list[[f]]$sex <- ifelse(sex == "f", 1, 2) 
   
   ##-- Age 
   # age <- matrix(data = NA, nrow = n.individuals, ncol = n.sessions)
@@ -222,11 +218,41 @@ for(f in 1:length(fragments)){
 }#f
 
 
+
+## ------   4. Format data in arrays ------
+##-- Extract the number of ids detected per fragment
+n.individuals <- unlist(lapply(data_list, function(x)x$n.individuals))
+maxIDs <- max(n.individuals)
+
+##-- Extract the number of capture sessions per fragment
+n.sessions <- unlist(lapply(data_list, function(x)x$n.sessions))
+maxSessions <- max(n.sessions)
+
+##-- Extract the number of months
+months <- unlist(lapply(data_list, function(x)x$months))
+maxMonths <- max(months)
+
+##-- Put into ragged arrays
+y <- array(NA, c(maxIDs, maxSessions, n.fragments))
+sex <- first <- matrix(NA, nrow = maxIDs, ncol = length(data_list))
+start.int <- end.int <- duration <- matrix(NA,nrow=maxSessions,ncol=length(data_list))
+for(f in 1:length(data_list)){
+  y[1:n.individuals[f],1:n.sessions[f],f] <- data_list[[f]]$CH
+  sex[1:n.individuals[f],f] <- data_list[[f]]$sex
+  first[1:n.individuals[f],f] <- data_list[[f]]$first
+  start.int[1:n.sessions[f],f] <- data_list[[f]]$start.month.index
+  end.int[1:n.sessions[f],f] <- data_list[[f]]$end.month.index
+  duration[1:n.sessions[f],f] <- data_list[[f]]$duration
+}#f
+  
 ##-- Identify seasons for each month of the study
-# Wet season from October until June!
-n.months <- max(unlist(lapply(data_list, function(x)length(x$months))))
-season <- rep(c(1,1,1,1,1,1,2,2,2,1,1,1), length(years))
-season <- season[minMonth:(n.months + minMonth - 1)]
+years <- unique(unlist(lapply(data_list, function(x)x$years)))
+years <- min(years):max(years)
+season <- rep(c(1,1,1,1,1,1,2,2,2,1,1,1), length(years)) ## Wet season from October until June!
+season <- season[minMonth:(maxMonths + minMonth - 1)]
+
+##-- Identify protection status for each fragment
+status <- c(1,1,2,2,2,2,2,1)
 
 
 
@@ -236,19 +262,19 @@ season <- season[minMonth:(n.months + minMonth - 1)]
 nimModel <- nimbleCode({
 
   ## DEMOGRAPHIC PROCESS 
-  phi0[1,1,1] ~ dunif(0,1)  ## Baseline survival female/protected/wet
-  phi0[1,1,2] ~ dunif(0,1)  ## Baseline survival female/protected/dry
-  phi0[1,2,1] ~ dunif(0,1)  ## Baseline survival female/disturbed/wet
-  phi0[1,2,2] ~ dunif(0,1)  ## Baseline survival female/disturbed/dry
-  phi0[2,1,1] ~ dunif(0,1)  ## Baseline survival male/protected/wet
-  phi0[2,1,2] ~ dunif(0,1)  ## Baseline survival male/protected/dry
-  phi0[2,2,1] ~ dunif(0,1)  ## Baseline survival male/disturbed/wet
-  phi0[2,2,2] ~ dunif(0,1)  ## Baseline survival male/disturbed/dry
+  phi0[1,1,1] ~ dunif(0,1)  ## Baseline survival female/disturbed/wet
+  phi0[2,1,1] ~ dunif(0,1)  ## Baseline survival male/disturbed/wet
+  phi0[1,2,1] ~ dunif(0,1)  ## Baseline survival female/protected/wet
+  phi0[2,2,1] ~ dunif(0,1)  ## Baseline survival male/protected/wet
+  phi0[1,1,2] ~ dunif(0,1)  ## Baseline survival female/disturbed/dry
+  phi0[2,1,2] ~ dunif(0,1)  ## Baseline survival male/disturbed/dry
+  phi0[1,2,2] ~ dunif(0,1)  ## Baseline survival female/protected/dry
+  phi0[2,2,2] ~ dunif(0,1)  ## Baseline survival male/protected/dry
   
-  beta[1,1] ~ dnorm(0,0.01) ## Temporal effect female/protected
-  beta[1,2] ~ dnorm(0,0.01) ## Temporal effect female/disturbed
-  beta[2,1] ~ dnorm(0,0.01) ## Temporal effect male/protected
-  beta[2,2] ~ dnorm(0,0.01) ## Temporal effect male/disturbed
+  beta[1,1] ~ dnorm(0,0.01) ## Temporal effect female/disturbed
+  beta[2,1] ~ dnorm(0,0.01) ## Temporal effect male/disturbed
+  beta[1,2] ~ dnorm(0,0.01) ## Temporal effect female/protected
+  beta[2,2] ~ dnorm(0,0.01) ## Temporal effect male/protected
   
   for(m in 1:n.months){
     logit(PHI[1,1,m]) <- logit(phi0[1,1,season[m]]) + beta[1,1] * m
@@ -262,67 +288,71 @@ nimModel <- nimbleCode({
     for(t in 1:n.intervals[f]){
       phi[1,t,f] <- prod(PHI[1,status[f],start.int[t,f]:end.int[t,f]])
       phi[2,t,f] <- prod(PHI[2,status[f],start.int[t,f]:end.int[t,f]])
-    }# time
+    }# t
     
     for(i in 1:n.individuals[f]){
       z[i,first[i,f],f] ~ dbern(1)  
       for(t in first[i,f]:n.intervals[f]){
-        z[i,t+1,f] ~ dbern(z[i,t,f] * phi[sex[i],t,f])  
+        z[i,t+1,f] ~ dbern(z[i,t,f] * phi[sex[i,f],t,f])  
       }#t
     }#i
   }#f
   
   
   ## DETECTION PROCESS
-  lambda[1,1] ~ dunif(0,5) ## Detection Hazard rate female/protected
-  lambda[1,2] ~ dunif(0,5) ## Detection Hazard rate female/disturbed
-  lambda[2,1] ~ dunif(0,5) ## Detection Hazard rate male/protected
-  lambda[2,2] ~ dunif(0,5) ## Detection Hazard rate male/disturbed
+  lambda[1,1] ~ dunif(0,5) ## Detection Hazard rate female/disturbed
+  lambda[2,1] ~ dunif(0,5) ## Detection Hazard rate male/disturbed
+  lambda[1,2] ~ dunif(0,5) ## Detection Hazard rate female/protected
+  lambda[2,2] ~ dunif(0,5) ## Detection Hazard rate male/protected
   
   ## Multi-sites model
   for(f in 1:n.fragments){
     for(t in 1:n.sessions[f]){
       ## Allows for unequal sampling sessions (sessionDuration[t])
-      p[1,t,f] <- 1-exp(-lambda[1,status[f]] * sessionDuration[t,f]) 
-      p[2,t,f] <- 1-exp(-lambda[2,status[f]] * sessionDuration[t,f]) 
+      p[1,t,f] <- 1-exp(-lambda[1,status[f]] * duration[t,f]) 
+      p[2,t,f] <- 1-exp(-lambda[2,status[f]] * duration[t,f]) 
     }# session
     
     for(i in 1:n.individuals[f]){
-      for(t in (first[i]+1):n.sessions[f]){
-        y[i,t,f] ~ dbern(p[sex[i],t,f] * z[i,t,f])
+      for(t in (first[i,f]+1):n.sessions[f]){
+        y[i,t,f] ~ dbern(p[sex[i,f],t,f] * z[i,t,f])
       }#t
     }#i
   }#f
 })
 
 ##-- Format the data for NIMBLE
-nimData <- list( y = thisCH,
-                 sessionDuration = sess13$duration)
+nimData <- list( y = y)
 
-nimConstants <- list( n.individuals = dim(thisCH)[1],
-                      n.intervals = dim(thisCH)[2]-1,
-                      n.sessions = dim(thisCH)[2],
-                      n.months = n.months,
+nimConstants <- list( n.individuals = n.individuals,
+                      n.fragments = n.fragments,
+                      n.intervals = n.sessions-1,
+                      n.sessions = n.sessions,
+                      n.months = maxMonths,
+                      sex = sex,
                       season = season,
-                      f = f,
+                      status = status,
+                      first = first,
                       start.int = start.int,
-                      end.int = end.int)
+                      end.int = end.int,
+                      duration = duration)
 
-
-l <- apply(nimData$y, 1, function(x)max(which(x == 1)))
-z.init <- matrix(data =  NA,
-                 nrow = nrow(nimData$y),
-                 ncol = ncol(nimData$y))
-for(i in 1:dim(z.init)[1]){
-  z.init[i,f[i]:l[i]] <- 1
-  if(l[i]<dim(z.init)[2]){
-    z.init[i,(l[i]+1):(dim(z.init)[2])] <- 0
-  }
+last <- apply(nimData$y, c(1,3), function(x)max(which(x == 1)))
+last[is.infinite(last)] <- NA
+z.init <- array(NA, c(maxIDs,maxSessions,n.fragments))
+for(f in 1:n.fragments){
+  for(i in 1:n.individuals[f]){
+    z.init[i,first[i,f]:last[i,f],f] <- 1
+    if(last[i,f] < n.sessions[f]){
+      z.init[i,(last[i,f]+1):n.sessions[f],f] <- 0
+    }
+  }#f
 }#i
+
 nimInits <- list( z = z.init,
-                  phi0 = c(0.85,0.85),
-                  beta = c(0),
-                  lambda = 0.5)
+                  phi0 = array(0.85,c(2,2,2)),
+                  beta = matrix(0,2,2),
+                  lambda = matrix(0.5,2,2))
 
 
 ##-- Create a NIMBLE model object
@@ -336,7 +366,7 @@ Rmodel$calculate()
 ##-- Configure and Build MCMC objects
 conf <- configureMCMC(Rmodel, monitors = c("phi0", "beta", "lambda"), print = FALSE)
 Rmcmc <- buildMCMC(conf)
-23,,
+
 ##-- Compile and Run MCMC
 ## Finally, we compile both the model and MCMC objects and execute the compiled 
 ## MCMC for 50 000 iterations and 3 chains.
@@ -344,15 +374,17 @@ Cmodel <- compileNimble(Rmodel)
 Cmcmc <- compileNimble(Rmcmc, project = Rmodel)
 MCMC_runtime <- system.time(
   nimOutput <- runMCMC( Cmcmc,
-                        niter = 100000,
-                        nburnin = 50000,
+                        niter = 11000,
+                        nburnin = 1000,
                         nchains = 3,
-                        thin = 5,
+                        thin = 1,
                         samplesAsCodaMCMC = T)
 )
 plot(nimOutput)
 save(nimOutput, MCMC_runtime,
-     file = file.path(analysisDir, "m16.RData"))
+     file = file.path(resultDir, "multiFragments.RData"))
+
+
 
 ## -----------------------------------------------------------------------------
 ## For recruitment, take the approach of N.Hostetter
@@ -360,4 +392,3 @@ save(nimOutput, MCMC_runtime,
 ## then derive gammas from betas using:
 ## gamma[t] <- 1-sum(beta[1:t]) ... or something similar
 ## check in the age model!!!!
-
