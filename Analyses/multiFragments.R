@@ -37,12 +37,44 @@ capture_data <- capture_data[!(capture_data$transponder == "/?/"), ] %>% droplev
 ##-- Format dates
 capture_data$date <- as.POSIXct(strptime(capture_data$date, "%m/%d/%Y"))
 
+##-- Clean-up fragments names
+unique(capture_data$site)
+capture_data$site[capture_data$site == "M13R"] <- "M13"
+capture_data$site[capture_data$site == "M15A"] <- "M15a"
+capture_data$site[capture_data$site == "M15D"] <- "M15d"
+capture_data$site[capture_data$site == "M15E"] <- "M15e"
+capture_data$site[capture_data$site == "M16 Vao"] <- "M16"
+capture_data$site[capture_data$site == "Bush clearing"] <- "Bush"
+capture_data$site[capture_data$site == "Bush cl"] <- "Bush"
+
+fragments <- c("M13","M15a","M15b","M15c","M15d","M15e","M16")
+# fragments <- c("M3","M4","M5","M6","M7","M9","M11","M12","M13",
+#                "M15a","M15b","M15c","M15d","M15e","M16","M16_Bakuli","M20",
+#                "Bush clearing","Bush cl","Cage","Mine","Corr  R.","Corr  E.",
+#                "Tokon'ala")
+capture_data <- capture_data[capture_data$site %in% fragments, ] 
+
 
 
 ## ------   2. Capture sessions ------
 ##-- Load capture sessions data
 capture_sessions <- read.csv(file.path(dataDir, "sessions_dates_sites.csv"),h=T)
 names(capture_sessions) <- c("start.date", "end.date", "site")
+
+##-- Clean-up fragments names
+unique(capture_sessions$site)
+# [1] "M16"                "M3"                 "M15a"               "M4"                
+# [5] "M5"                 "M20"                "M16_Bakuli"         "Corridor"          
+# [9] "M6"                 "M13"                "M1"                 "M15b"              
+# [13] "Bush clearing"      "Cage"               "Mine"               "Corr"              
+# [17] "Corr R."            "M13R"               "Corr R. et M13R"    "M13R et M15E"      
+# [21] "Tokon'ala"          "Corr E."            "Corr M16"           "M16 Vao"           
+# [25] "M15c"               "M15d"               "M7"                 "M12"               
+# [29] "M11"                "M9"                 "Herbarium"          "Salle des graines "
+
+# capture_sessions$site[capture_sessions$site == "M13R et M15E" ] <- "???"
+
+capture_sessions[capture_sessions$site %in% fragments, ]
 
 ##-- Format dates
 capture_sessions$end.date <- as.POSIXct(strptime(capture_sessions$end.date, "%m/%d/%Y"))
@@ -71,8 +103,8 @@ aggSessions <- merge( aggSessions, durationAggSessions,
                  by = c("start.month", "start.year", "site"))
 
 
+
 ## ------   3. Clean data for each fragment ------
-fragments <- unique(capture_data$site)
 minYear <- min(capture_sessions$start.year)
 minMonth <- min(capture_sessions$start.month[capture_sessions$start.year == minYear])
 
@@ -83,9 +115,6 @@ for(f in 1:length(fragments)){
   print(fragments[f])
   thisData <- capture_data[capture_data$site == fragments[f], ]
   thisSessions <- capture_sessions[capture_sessions$site == fragments[f], ]
-  
-  ##-- Ignore fragments with less than 2 sessions 
-  if(dim(thisSessions)[1] < 2){next}
   
   ##-- Ensure sessions are ordered by start.date
   thisSessions <- thisSessions[order(thisSessions$start.date), ]
@@ -110,12 +139,13 @@ for(f in 1:length(fragments)){
   }#s
   
   ##-- Calculate range of years covered by the study in this fragment
-  years <- minYear:max(thisSessions$start.year)
+  years <- min(thisSessions$start.year):max(thisSessions$start.year)
   data_list[[f]]$years <- years
   data_list[[f]]$n.years <- length(years)
   
   ##-- Calculate range of months covered by the study in this fragment
-  data_list[[f]]$months <- 1:max(thisSessions$start.month.index)
+  months <- min(thisSessions$start.month.index):max(thisSessions$start.month.index)
+  data_list[[f]]$months <- months
   data_list[[f]]$n.months <- length(months)-1
 
   
@@ -126,6 +156,9 @@ for(f in 1:length(fragments)){
   for(c in 1:nrow(thisData)){
     temp <- thisSessions$index[thisSessions$start.date <= thisData$date[c] &
                                  thisSessions$end.date >= thisData$date[c]]
+    ## [PD]: WARNING!!!
+    ## SOME CAPTURES WERE RECORDED OUTSIDE THE OFFICIAL CAPTURE SESSIONS
+    if(length(temp) == 0)stop()
     thisData$session[c] <- ifelse(length(temp) == 0, NA, temp)
   }#c
   
@@ -146,8 +179,8 @@ for(f in 1:length(fragments)){
   first <- apply(thisCH, 1, function(x)min(which(x >= 1)))
   
   ##-- Remove individuals detected for the first time on the last session
-  #thisCH <- thisCH[which(first != dim(thisCH)[2]), ]
-  #data_list[[f]]$f <- first[which(first != dim(thisCH)[2])]
+  thisCH <- thisCH[which(first != dim(thisCH)[2]), ]
+  data_list[[f]]$first <- first[which(first != dim(thisCH)[2])]
   
   ##-- Reorder and turn into a matrix
   thisCH <- thisCH[order(dimnames(thisCH)[[1]]), ]
@@ -162,10 +195,10 @@ for(f in 1:length(fragments)){
   data_list[[f]]$n.individuals <- length(ids)
   
   ##-- Sex
-  sex <- unique(thisData[thisData$transponder %in% ids, c("transponder", "Sexe")])
+  sex <- unique(thisData[thisData$transponder %in% ids, c("transponder","Sexe")])
   sex <- sex[order(sex$transponder), ] 
   all(dimnames(thisCH)[[1]] == sex$transponder)
-  data_list[[f]]$sex <- ifelse(sex$Sexe == "f", 1, 2) 
+  data_list[[f]]$sex <- ifelse(sex$Sexe == "f",1,2) 
   
   ##-- Age 
   # age <- matrix(data = NA, nrow = n.individuals, ncol = n.sessions)
@@ -189,52 +222,77 @@ for(f in 1:length(fragments)){
 }#f
 
 
-
 ##-- Identify seasons for each month of the study
 # Wet season from October until June!
-season <- rep(c(1,1,1,1,1,1,2,2,2,1,1,1), n.years)
-season <- season[minMonth:(n.months+minMonth-1)]
+n.months <- max(unlist(lapply(data_list, function(x)length(x$months))))
+season <- rep(c(1,1,1,1,1,1,2,2,2,1,1,1), length(years))
+season <- season[minMonth:(n.months + minMonth - 1)]
 
-data_list[[6]]
+
+
 ## -----------------------------------------------------------------------------
-## ------ III. NIMBLE MODEL ,------
+## ------ II. NIMBLE MODEL ------
 ##-- Write the CR model in NIMBLE
 nimModel <- nimbleCode({
+
   ## DEMOGRAPHIC PROCESS 
-  phi0[1] ~ dunif(0,1)
-  phi0[2] ~ dunif(0,1)
-  logit.phi0[1] <- logit(phi0[1])
-  logit.phi0[2] <- logit(phi0[2])
-  beta ~ dnorm(0,0.01)
+  phi0[1,1,1] ~ dunif(0,1)  ## Baseline survival female/protected/wet
+  phi0[1,1,2] ~ dunif(0,1)  ## Baseline survival female/protected/dry
+  phi0[1,2,1] ~ dunif(0,1)  ## Baseline survival female/disturbed/wet
+  phi0[1,2,2] ~ dunif(0,1)  ## Baseline survival female/disturbed/dry
+  phi0[2,1,1] ~ dunif(0,1)  ## Baseline survival male/protected/wet
+  phi0[2,1,2] ~ dunif(0,1)  ## Baseline survival male/protected/dry
+  phi0[2,2,1] ~ dunif(0,1)  ## Baseline survival male/disturbed/wet
+  phi0[2,2,2] ~ dunif(0,1)  ## Baseline survival male/disturbed/dry
+  
+  beta[1,1] ~ dnorm(0,0.01) ## Temporal effect female/protected
+  beta[1,2] ~ dnorm(0,0.01) ## Temporal effect female/disturbed
+  beta[2,1] ~ dnorm(0,0.01) ## Temporal effect male/protected
+  beta[2,2] ~ dnorm(0,0.01) ## Temporal effect male/disturbed
+  
   for(m in 1:n.months){
-    logit(PHI[m]) <- logit.phi0[season[m]] + beta * m
+    logit(PHI[1,1,m]) <- logit(phi0[1,1,season[m]]) + beta[1,1] * m
+    logit(PHI[1,2,m]) <- logit(phi0[1,2,season[m]]) + beta[1,2] * m
+    logit(PHI[2,1,m]) <- logit(phi0[2,1,season[m]]) + beta[2,1] * m
+    logit(PHI[2,2,m]) <- logit(phi0[2,2,season[m]]) + beta[2,2] * m
   }# months
   
-  for(t in 1:n.intervals){
-    phi[t] <- prod(PHI[start.int[t]:end.int[t]])
-  }# time
+  ## Multi-sites model
+  for(f in 1:n.fragments){
+    for(t in 1:n.intervals[f]){
+      phi[1,t,f] <- prod(PHI[1,status[f],start.int[t,f]:end.int[t,f]])
+      phi[2,t,f] <- prod(PHI[2,status[f],start.int[t,f]:end.int[t,f]])
+    }# time
+    
+    for(i in 1:n.individuals[f]){
+      z[i,first[i,f],f] ~ dbern(1)  
+      for(t in first[i,f]:n.intervals[f]){
+        z[i,t+1,f] ~ dbern(z[i,t,f] * phi[sex[i],t,f])  
+      }#t
+    }#i
+  }#f
   
-  for(i in 1:n.individuals){
-    z[i,f[i]] ~ dbern(1)  
-    for(t in f[i]:n.intervals){
-      z[i,t+1] ~ dbern(z[i,t] * phi[t])  
-    }#t
-  }#i
   
   ## DETECTION PROCESS
-  ## Detection Hazard rate
-  lambda ~ dunif(0,5)                   
-  for(t in 1:n.sessions){
-    ## Allows for unequal sampling sessions (sessionDuration[t])
-    p[t] <- 1-exp(-lambda * sessionDuration[t]) 
-  }# session
+  lambda[1,1] ~ dunif(0,5) ## Detection Hazard rate female/protected
+  lambda[1,2] ~ dunif(0,5) ## Detection Hazard rate female/disturbed
+  lambda[2,1] ~ dunif(0,5) ## Detection Hazard rate male/protected
+  lambda[2,2] ~ dunif(0,5) ## Detection Hazard rate male/disturbed
   
-  for(i in 1:n.individuals){
-    for(t in (f[i]+1):n.sessions){
-      y[i,t] ~ dbern(p[t] * z[i,t])
-    }#t
-  }#i
-  
+  ## Multi-sites model
+  for(f in 1:n.fragments){
+    for(t in 1:n.sessions[f]){
+      ## Allows for unequal sampling sessions (sessionDuration[t])
+      p[1,t,f] <- 1-exp(-lambda[1,status[f]] * sessionDuration[t,f]) 
+      p[2,t,f] <- 1-exp(-lambda[2,status[f]] * sessionDuration[t,f]) 
+    }# session
+    
+    for(i in 1:n.individuals[f]){
+      for(t in (first[i]+1):n.sessions[f]){
+        y[i,t,f] ~ dbern(p[sex[i],t,f] * z[i,t,f])
+      }#t
+    }#i
+  }#f
 })
 
 ##-- Format the data for NIMBLE
@@ -302,3 +360,4 @@ save(nimOutput, MCMC_runtime,
 ## then derive gammas from betas using:
 ## gamma[t] <- 1-sum(beta[1:t]) ... or something similar
 ## check in the age model!!!!
+
