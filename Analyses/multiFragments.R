@@ -36,6 +36,7 @@ capture_data <- capture_data[!(capture_data$transponder == "/?/"), ] %>% droplev
 
 ##-- Format dates
 capture_data$date <- as.POSIXct(strptime(capture_data$date, "%m/%d/%Y"))
+capture_data$month <- as.numeric(format(capture_data$date,"%m"))
 
 ##-- Clean-up fragments names
 capture_data$site <- toupper(capture_data$site)
@@ -84,8 +85,11 @@ durationAggSessions <- aggregate(duration ~ start.month + start.year + site,
                                  data = capture_sessions, FUN = sum)
 aggSessions <- merge( startAggSessions, endAggSessions,
                  by = c("start.month", "start.year", "site"))
-aggSessions <- merge( aggSessions, durationAggSessions,
+capture_sessions <- merge( aggSessions, durationAggSessions,
                  by = c("start.month", "start.year", "site"))
+
+##-- Extract sesaon for each capture session
+capture_sessions$season <- ifelse(capture_sessions$start.month %in% c(6,7,8,9), 2, 1)
 
 
 
@@ -127,6 +131,7 @@ for(f in 1:n.fragments){
   data_list[[f]]$start.month.index <- thisSessions$start.month.index
   data_list[[f]]$end.month.index <- thisSessions$end.month.index
   data_list[[f]]$duration <- thisSessions$duration 
+  data_list[[f]]$seas <- thisSessions$seas 
   
   ##-- Calculate range of years covered by the study in this fragment
   years <- min(thisSessions$start.year):max(thisSessions$start.year)
@@ -235,7 +240,9 @@ maxMonths <- max(months)
 ##-- Put into ragged arrays
 y <- array(NA, c(maxIDs, maxSessions, n.fragments))
 sex <- first <- matrix(NA, nrow = maxIDs, ncol = length(data_list))
-start.int <- end.int <- duration <- matrix(NA,nrow=maxSessions,ncol=length(data_list))
+start.int <- end.int <- duration <- seas <- matrix( NA,
+                                                    nrow = maxSessions,
+                                                    ncol = length(data_list))
 for(f in 1:length(data_list)){
   y[1:n.individuals[f],1:n.sessions[f],f] <- data_list[[f]]$CH
   sex[1:n.individuals[f],f] <- data_list[[f]]$sex
@@ -243,12 +250,15 @@ for(f in 1:length(data_list)){
   start.int[1:n.sessions[f],f] <- data_list[[f]]$start.month.index
   end.int[1:n.sessions[f],f] <- data_list[[f]]$end.month.index
   duration[1:n.sessions[f],f] <- data_list[[f]]$duration
+  seas[1:n.sessions[f],f] <- data_list[[f]]$seas
 }#f
   
 ##-- Identify seasons for each month of the study
 years <- unique(unlist(lapply(data_list, function(x)x$years)))
 years <- min(years):max(years)
-season <- rep(c(1,1,1,1,1,1,2,2,2,1,1,1), length(years)) ## Wet season from October until June!
+
+##-- Wet season from October until May!
+season <- rep(c(1,1,1,1,1,2,2,2,2,1,1,1), length(years)) 
 season <- season[minMonth:(maxMonths + minMonth - 1)]
 
 ##-- Identify protection status for each fragment
@@ -300,17 +310,21 @@ nimModel <- nimbleCode({
   
   
   ## DETECTION PROCESS
-  lambda[1,1] ~ dunif(0,5) ## Detection Hazard rate female/disturbed
-  lambda[2,1] ~ dunif(0,5) ## Detection Hazard rate male/disturbed
-  lambda[1,2] ~ dunif(0,5) ## Detection Hazard rate female/protected
-  lambda[2,2] ~ dunif(0,5) ## Detection Hazard rate male/protected
+  lambda[1,1,1] ~ dunif(0,5) ## Detection Hazard rate female/disturbed/wet
+  lambda[2,1,1] ~ dunif(0,5) ## Detection Hazard rate male/disturbed/wet
+  lambda[1,2,1] ~ dunif(0,5) ## Detection Hazard rate female/protected/wet
+  lambda[2,2,1] ~ dunif(0,5) ## Detection Hazard rate male/protected/wet
+  lambda[1,1,2] ~ dunif(0,5) ## Detection Hazard rate female/disturbed/dry
+  lambda[2,1,2] ~ dunif(0,5) ## Detection Hazard rate male/disturbed/dry
+  lambda[1,2,2] ~ dunif(0,5) ## Detection Hazard rate female/protected/dry
+  lambda[2,2,2] ~ dunif(0,5) ## Detection Hazard rate male/protected/dry
   
   ## Multi-sites model
   for(f in 1:n.fragments){
     for(t in 1:n.sessions[f]){
       ## Allows for unequal sampling sessions (sessionDuration[t])
-      p[1,t,f] <- 1-exp(-lambda[1,status[f]] * duration[t,f]) 
-      p[2,t,f] <- 1-exp(-lambda[2,status[f]] * duration[t,f]) 
+      p[1,t,f] <- 1-exp(-lambda[1,status[f],seas[t,f]] * duration[t,f]) 
+      p[2,t,f] <- 1-exp(-lambda[2,status[f],seas[t,f]] * duration[t,f]) 
     }# session
     
     for(i in 1:n.individuals[f]){
@@ -320,6 +334,7 @@ nimModel <- nimbleCode({
     }#i
   }#f
 })
+
 
 ##-- Format the data for NIMBLE
 nimData <- list( y = y)
@@ -331,6 +346,7 @@ nimConstants <- list( n.individuals = n.individuals,
                       n.months = maxMonths,
                       sex = sex,
                       season = season,
+                      seas = seas,
                       status = status,
                       first = first,
                       start.int = start.int,
@@ -352,7 +368,7 @@ for(f in 1:n.fragments){
 nimInits <- list( z = z.init,
                   phi0 = array(0.85,c(2,2,2)),
                   beta = matrix(0,2,2),
-                  lambda = matrix(0.5,2,2))
+                  lambda = array(0.5,c(2,2,2)))
 
 
 ##-- Create a NIMBLE model object
@@ -374,7 +390,7 @@ Cmodel <- compileNimble(Rmodel)
 Cmcmc <- compileNimble(Rmcmc, project = Rmodel)
 MCMC_runtime <- system.time(
   nimOutput <- runMCMC( Cmcmc,
-                        niter = 11000,
+                        niter = 16000,
                         nburnin = 1000,
                         nchains = 3,
                         thin = 1,
@@ -387,8 +403,79 @@ save(nimOutput, MCMC_runtime,
 
 
 ## -----------------------------------------------------------------------------
+## ------ III. EXPLORE OUTPUTS -----
+source("C:/My_documents/RovQuant/Temp/PD/FUNCTIONS/FunctionScripts/wildMap.R")
+myCols <- wildMap(4)
+
+load(file = file.path(resultDir, "multiFragments.RData"))
+n.months <- nimConstants$n.months
+nimMat <- do.call(rbind, nimOutput)
+n.iter <- dim(nimMat)[1]
+beta <- array(nimMat[ ,1:4], c(n.iter,2,2))
+phi0 <- array(nimMat[ ,13:20], c(n.iter,2,2,2))
+PHI <- array(NA, c(n.iter,2,2,n.months))
+for(m in 1:n.months){
+  PHI[ ,1,1,m] <- ilogit(logit(phi0[ ,1,1,season[m]]) + beta[ ,1,1] * m)
+  PHI[ ,1,2,m] <- ilogit(logit(phi0[ ,1,2,season[m]]) + beta[ ,1,2] * m)
+  PHI[ ,2,1,m] <- ilogit(logit(phi0[ ,2,1,season[m]]) + beta[ ,2,1] * m)
+  PHI[ ,2,2,m] <- ilogit(logit(phi0[ ,2,2,season[m]]) + beta[ ,2,2] * m)
+}# months
+
+
+mean.PHI <- apply(PHI, c(2,3,4), mean)
+upper.PHI <- apply(PHI, c(2,3,4), function(x)quantile(x,0.975))
+lower.PHI <- apply(PHI, c(2,3,4), function(x)quantile(x,0.025))
+
+pdf(file.path(resultDir,"02_Multi fragments/survivalProbabilities.pdf"),
+    width = 12, height = 7)
+par(mfrow = c(1,2))
+## FEMALES
+plot(1, type = "n", xlim = c(0,n.months+1), ylim = c(0, 1), axes = F,
+     ylab = "Survival prob.", xlab = "Months", main = "Females")
+axis(1, at = seq(0,250,50), labels = seq(0,250,50))
+axis(2, at = seq(0,1,0.2), labels = seq(0,1,0.2))
+legend( x = 1, y = 0.3,
+        title = "Fragment status:",
+        legend = c("Degraded", "Protected"),
+        bty = "n",
+        fill = myCols[c(2,4)])
+
+## Female disturbed
+polygon(x = c(1:n.months,n.months:1),
+        y = c(upper.PHI[1,1, ],rev(lower.PHI[1,1, ])),
+        col = adjustcolor(myCols[2],alpha.f = 0.5), border = F)
+points(1:n.months, mean.PHI[1,1,], type = "l", lwd = 2, col = myCols[2])
+
+## Female protected
+polygon(x = c(1:n.months,n.months:1),
+        y = c(upper.PHI[1,2, ],rev(lower.PHI[1,2, ])),
+        col = adjustcolor(myCols[4],alpha.f = 0.5), border = F)
+points(1:n.months, mean.PHI[1,2,], type = "l", lwd = 2, col = myCols[4])
+
+
+## MALES
+plot(1, type = "n", xlim = c(0,n.months+1), ylim = c(0, 1), axes = F,
+     ylab = "Survival prob.", xlab = "Months", main = "Males")
+axis(1, at = seq(0,250,50), labels = seq(0,250,50))
+axis(2, at = seq(0,1,0.2), labels = seq(0,1,0.2))
+
+## Male disturbed
+polygon(x = c(1:n.months,n.months:1),
+        y = c(upper.PHI[2,1, ],rev(lower.PHI[2,1, ])),
+        col = adjustcolor(myCols[2],alpha.f = 0.5), border = F)
+points(1:n.months, mean.PHI[2,1,], type = "l", lwd = 2, col = myCols[2])
+
+## Male protected
+polygon(x = c(1:n.months,n.months:1),
+        y = c(upper.PHI[2,2, ],rev(lower.PHI[2,2, ])),
+        col = adjustcolor(myCols[4], alpha.f = 0.5), border = F)
+points(1:n.months, mean.PHI[2,2,], type = "l", lwd = 2, col = myCols[4])
+dev.off()
+
+
 ## For recruitment, take the approach of N.Hostetter
 ## use monthly betas, with sum(betas[1:n.months]) = 1
 ## then derive gammas from betas using:
 ## gamma[t] <- 1-sum(beta[1:t]) ... or something similar
 ## check in the age model!!!!
+## -----------------------------------------------------------------------------
