@@ -303,16 +303,16 @@ status <- c(1,1,2,2,2,2,2,1)
 nimModel <- nimbleCode({
   
   ## DEMOGRAPHIC PROCESS 
-  phi0[1,1] ~ dunif(0,1)  ## Baseline survival female/disturbed
-  phi0[2,1] ~ dunif(0,1)  ## Baseline survival male/disturbed
-  phi0[1,2] ~ dunif(0,1)  ## Baseline survival female/protected
-  phi0[2,2] ~ dunif(0,1)  ## Baseline survival male/protected
+  logit.phi0[1,1] ~ dnorm(0,0.01)  ## Baseline survival female/disturbed
+  logit.phi0[2,1] ~ dnorm(0,0.01)  ## Baseline survival male/disturbed
+  logit.phi0[1,2] ~ dnorm(0,0.01)  ## Baseline survival female/protected
+  logit.phi0[2,2] ~ dnorm(0,0.01)  ## Baseline survival male/protected
 
-  beta.time[1,1] ~ dnorm(0,0.01) ## Temporal effect female/disturbed
-  beta.time[2,1] ~ dnorm(0,0.01) ## Temporal effect male/disturbed
-  beta.time[1,2] ~ dnorm(0,0.01) ## Temporal effect female/protected
-  beta.time[2,2] ~ dnorm(0,0.01) ## Temporal effect male/protected
-  
+  # beta.time[1,1] ~ dnorm(0,0.01) ## Temporal effect female/disturbed
+  # beta.time[2,1] ~ dnorm(0,0.01) ## Temporal effect male/disturbed
+  # beta.time[1,2] ~ dnorm(0,0.01) ## Temporal effect female/protected
+  # beta.time[2,2] ~ dnorm(0,0.01) ## Temporal effect male/protected
+   
   beta.temp[1,1] ~ dnorm(0,0.01) ## Temperature effect female/disturbed
   beta.temp[2,1] ~ dnorm(0,0.01) ## Temperature effect male/disturbed
   beta.temp[1,2] ~ dnorm(0,0.01) ## Temperature effect female/protected
@@ -320,10 +320,10 @@ nimModel <- nimbleCode({
   
   
   for(m in 1:n.months){
-    logit(PHI[1,1,m]) <- logit(phi0[1,1]) + beta.temp[1,1] * temp[m] + beta.time[1,1] * m
-    logit(PHI[2,1,m]) <- logit(phi0[2,1]) + beta.temp[2,1] * temp[m] + beta.time[2,1] * m
-    logit(PHI[1,2,m]) <- logit(phi0[1,2]) + beta.temp[1,2] * temp[m] + beta.time[1,2] * m
-    logit(PHI[2,2,m]) <- logit(phi0[2,2]) + beta.temp[2,2] * temp[m] + beta.time[2,2] * m
+    logit(PHI[1,1,m]) <- logit.phi0[1,1] + beta.temp[1,1] * temp[m] # + beta.time[1,1] * m
+    logit(PHI[2,1,m]) <- logit.phi0[2,1] + beta.temp[2,1] * temp[m] # + beta.time[2,1] * m
+    logit(PHI[1,2,m]) <- logit.phi0[1,2] + beta.temp[1,2] * temp[m] # + beta.time[1,2] * m
+    logit(PHI[2,2,m]) <- logit.phi0[2,2] + beta.temp[2,2] * temp[m] # + beta.time[2,2] * m
   }# months
   
   ## Multi-sites model
@@ -401,10 +401,10 @@ for(f in 1:n.fragments){
 }#i
 
 nimInits <- list( z = z.init,
-                  phi0 = matrix(0.85,2,2),
-                  beta.time = matrix(0,2,2),
+                  phi0 = matrix(0.9,2,2),
+                  #beta.time = matrix(0,2,2),
                   beta.temp = matrix(0,2,2),
-                  lambda0 = matrix(0.5,2,2),
+                  lambda0 = matrix(0,2,2),
                   gamma.temp = matrix(0,2,2))
 
 
@@ -418,7 +418,7 @@ Rmodel$calculate()
 
 ##-- Configure and Build MCMC objects
 conf <- configureMCMC(Rmodel,
-                      monitors = c("phi0", "beta.time", "beta.temp", "gamma.temp", "lambda0"),
+                      monitors = c("logit.phi0", "beta.temp", "gamma.temp", "lambda0"),#"beta.time", 
                       print = FALSE)
 Rmcmc <- buildMCMC(conf)
 
@@ -429,10 +429,10 @@ Cmodel <- compileNimble(Rmodel)
 Cmcmc <- compileNimble(Rmcmc, project = Rmodel)
 MCMC_runtime <- system.time(
   nimOutput <- runMCMC( Cmcmc,
-                        niter = 50000,
+                        niter = 1000,
                         nburnin = 0,
-                        nchains = 2,
-                        thin = 3,
+                        nchains = 1,
+                        thin = 1,
                         samplesAsCodaMCMC = T)
 )
 plot(nimOutput)
