@@ -16,7 +16,7 @@ library(nimble)
 
 ## ------ WORKING DIRECTORIES ------
 source("workingDirectories.R")
-modelName <- "microcebe_temperature"
+modelName <- "microcebe_temp_time_transloc"
 source("C:/My_documents/RovQuant/Temp/PD/FUNCTIONS/FunctionScripts/wildMap.R")
 myCols <- wildMap(4)
 
@@ -231,18 +231,17 @@ for(f in 1:n.fragments){
   sex <- NULL
   for(i in 1:length(ids)){
     sex[i] <- unique(thisData$Sexe[thisData$transponder == ids[i]])
-    if(length(sex[i]) != 1)stop("sex issue")
+    if(length(sex[i]) != 1)stop(paste("sex issue with id:", ids[i]))
   }#i
   data_list[[f]]$sex <- ifelse(sex == "f", 1, 2) 
   
-  ##-- Age 
-  # age <- matrix(data = NA, nrow = n.individuals, ncol = n.sessions)
-  # for(i in ids){
-  #   for(s in thisSessions$index){
-  #     temp <- thisData[thisData$transponder == i & thisData$session == s, ]
-  #     if(length(temp) != 0){ age[i,s] <- unique(temp$age_estimation_2) }
-  #   }
-  # }
+  ##-- Translocation
+  transloc <- NULL
+  for(i in 1:length(ids)){
+    transloc[i] <- unique(thisData$residency[thisData$transponder == ids[i]])
+    if(length(transloc[i]) != 1)stop("translocation issue")
+  }#i
+  data_list[[f]]$transloc <- ifelse(transloc == "resident", 1, 2) 
   
   ##-- Interval lengths between capture sessions
   data_list[[f]]$start.int <- data_list[[f]]$end.int <- NULL
@@ -255,8 +254,8 @@ for(f in 1:n.fragments){
   hist(rowSums(thisCH))                       ## num. of detections per id
   plot(thisSessions$duration, colSums(thisCH))## num. of ids detected per session duration
 }#f
-
 names(data_list) <- fragments
+
 
 
 ## ------   5. Format data in arrays ------
@@ -274,13 +273,14 @@ maxMonth <- max(months)
 
 ##-- Put into ragged arrays
 y <- array(NA, c(maxIDs, maxSessions, n.fragments))
-sex <- first <- matrix(NA, nrow = maxIDs, ncol = length(data_list))
+sex <- first <- transloc <- matrix(NA, nrow = maxIDs, ncol = length(data_list))
 start.int <- end.int <- duration <- seas <- temp2 <- matrix( NA,
-                                                    nrow = maxSessions,
-                                                    ncol = length(data_list))
+                                                             nrow = maxSessions,
+                                                             ncol = length(data_list))
 for(f in 1:length(data_list)){
   y[1:n.individuals[f],1:n.sessions[f],f] <- data_list[[f]]$CH
   sex[1:n.individuals[f],f] <- data_list[[f]]$sex
+  transloc[1:n.individuals[f],f] <- data_list[[f]]$transloc
   first[1:n.individuals[f],f] <- data_list[[f]]$first
   start.int[1:n.sessions[f],f] <- data_list[[f]]$start.month.index
   end.int[1:n.sessions[f],f] <- data_list[[f]]$end.month.index
@@ -301,7 +301,7 @@ season <- season[minMonth:(maxMonth + minMonth - 1)]
 weather$index <- (weather$YEAR-minYear)*12 + weather$MONTH- minMonth  + 1
 temp <- weather$T[weather$index >= 1 & weather$index <= maxMonth]
 precip <- weather$meanPP[weather$index >= 1 & weather$index <= maxMonth]
-  
+
 ##-- Identify protection status for each fragment
 status <- c(1,1,2,2,2,2,2,1)
 
@@ -312,16 +312,23 @@ status <- c(1,1,2,2,2,2,2,1)
 nimModel <- nimbleCode({
   
   ## DEMOGRAPHIC PROCESS 
-  logit.phi0[1,1] ~ dnorm(0,0.01)  ## Baseline survival female/disturbed
-  logit.phi0[2,1] ~ dnorm(0,0.01)  ## Baseline survival male/disturbed
-  logit.phi0[1,2] ~ dnorm(0,0.01)  ## Baseline survival female/protected
-  logit.phi0[2,2] ~ dnorm(0,0.01)  ## Baseline survival male/protected
-
-  # beta.time[1,1] ~ dnorm(0,0.01) ## Temporal effect female/disturbed
-  # beta.time[2,1] ~ dnorm(0,0.01) ## Temporal effect male/disturbed
-  # beta.time[1,2] ~ dnorm(0,0.01) ## Temporal effect female/protected
-  # beta.time[2,2] ~ dnorm(0,0.01) ## Temporal effect male/protected
-   
+  logit.phi0[1,1,1] ~ dnorm(0,0.01)  ## Baseline survival female/disturbed
+  logit.phi0[2,1,1] ~ dnorm(0,0.01)  ## Baseline survival male/disturbed
+  logit.phi0[1,2,1] ~ dnorm(0,0.01)  ## Baseline survival female/protected
+  logit.phi0[2,2,1] ~ dnorm(0,0.01)  ## Baseline survival male/protected
+  
+  beta.transloc ~ dnorm(0,0.01)
+  
+  logit.phi0[1,1,2] <- logit.phi0[1,1,1] + beta.transloc  ## Baseline survival female/disturbed/translocated
+  logit.phi0[2,1,2] <- logit.phi0[2,1,1] + beta.transloc   ## Baseline survival male/disturbed/translocated
+  logit.phi0[1,2,2] <- logit.phi0[1,2,1] + beta.transloc   ## Baseline survival female/protected/translocated
+  logit.phi0[2,2,2] <- logit.phi0[2,2,1] + beta.transloc   ## Baseline survival male/protected/translocated
+  
+  beta.time[1,1] ~ dnorm(0,0.01) ## Temporal effect female/disturbed
+  beta.time[2,1] ~ dnorm(0,0.01) ## Temporal effect male/disturbed
+  beta.time[1,2] ~ dnorm(0,0.01) ## Temporal effect female/protected
+  beta.time[2,2] ~ dnorm(0,0.01) ## Temporal effect male/protected
+  
   beta.temp[1,1] ~ dnorm(0,0.01) ## Temperature effect female/disturbed
   beta.temp[2,1] ~ dnorm(0,0.01) ## Temperature effect male/disturbed
   beta.temp[1,2] ~ dnorm(0,0.01) ## Temperature effect female/protected
@@ -329,23 +336,29 @@ nimModel <- nimbleCode({
   
   
   for(m in 1:n.months){
-    logit(PHI[1,1,m]) <- logit.phi0[1,1] + beta.temp[1,1] * temp[m] # + beta.time[1,1] * m
-    logit(PHI[2,1,m]) <- logit.phi0[2,1] + beta.temp[2,1] * temp[m] # + beta.time[2,1] * m
-    logit(PHI[1,2,m]) <- logit.phi0[1,2] + beta.temp[1,2] * temp[m] # + beta.time[1,2] * m
-    logit(PHI[2,2,m]) <- logit.phi0[2,2] + beta.temp[2,2] * temp[m] # + beta.time[2,2] * m
+    logit(PHI[1,1,1,m]) <- logit.phi0[1,1,1] + beta.temp[1,1] * temp[m] + beta.time[1,1] * m
+    logit(PHI[2,1,1,m]) <- logit.phi0[2,1,1] + beta.temp[2,1] * temp[m] + beta.time[2,1] * m
+    logit(PHI[1,2,1,m]) <- logit.phi0[1,2,1] + beta.temp[1,2] * temp[m] + beta.time[1,2] * m
+    logit(PHI[2,2,1,m]) <- logit.phi0[2,2,1] + beta.temp[2,2] * temp[m] + beta.time[2,2] * m
+    logit(PHI[1,1,2,m]) <- logit.phi0[1,1,2] + beta.temp[1,1] * temp[m] + beta.time[1,1] * m
+    logit(PHI[2,1,2,m]) <- logit.phi0[2,1,2] + beta.temp[2,1] * temp[m] + beta.time[2,1] * m
+    logit(PHI[1,2,2,m]) <- logit.phi0[1,2,2] + beta.temp[1,2] * temp[m] + beta.time[1,2] * m
+    logit(PHI[2,2,2,m]) <- logit.phi0[2,2,2] + beta.temp[2,2] * temp[m] + beta.time[2,2] * m
   }# months
   
   ## Multi-sites model
   for(f in 1:n.fragments){
     for(t in 1:n.intervals[f]){
-      phi[1,t,f] <- prod(PHI[1,status[f],start.int[t,f]:end.int[t,f]])
-      phi[2,t,f] <- prod(PHI[2,status[f],start.int[t,f]:end.int[t,f]])
+      phi[1,1,t,f] <- prod(PHI[1,1,status[f],start.int[t,f]:end.int[t,f]])
+      phi[2,1,t,f] <- prod(PHI[2,1,status[f],start.int[t,f]:end.int[t,f]])
+      phi[1,2,t,f] <- prod(PHI[1,2,status[f],start.int[t,f]:end.int[t,f]])
+      phi[2,2,t,f] <- prod(PHI[2,2,status[f],start.int[t,f]:end.int[t,f]])
     }# t
     
     for(i in 1:n.individuals[f]){
       z[i,first[i,f],f] ~ dbern(1)  
       for(t in first[i,f]:n.intervals[f]){
-        z[i,t+1,f] ~ dbern(z[i,t,f] * phi[sex[i,f],t,f])  
+        z[i,t+1,f] ~ dbern(z[i,t,f] * phi[sex[i,f],transloc[i,f],t,f])  
       }#t
     }#i
   }#f
@@ -390,6 +403,7 @@ nimConstants <- list( n.individuals = n.individuals,
                       n.sessions = n.sessions,
                       n.months = maxMonth,
                       sex = sex,
+                      transloc = transloc,
                       temp = temp,
                       temp2 = temp2,
                       status = status,
@@ -411,13 +425,15 @@ for(f in 1:n.fragments){
 }#i
 
 nimInits <- list( z = z.init,
-                  logit.phi0 = matrix(2.5,2,2),
-                  # beta.time = matrix(0,2,2),
+                  logit.phi0 = array(2.5,c(2,2,2)),
+                  beta.time = matrix(0,2,2),
                   beta.temp = matrix(0,2,2),
+                  beta.transloc = 0,
                   lambda0 = matrix(0,2,2),
                   gamma.temp = matrix(0,2,2))
 
-nimParams <- c("logit.phi0", "beta.temp", "gamma.temp", "lambda0")#"beta.time"
+nimParams <- c("logit.phi0", "beta.temp", "beta.time","beta.transloc",
+               "gamma.temp", "lambda0")
 
 
 
@@ -490,7 +506,7 @@ for(i in 1:length(outputs)){
 pdf(file = file.path(analysisDir,modelName,"Traceplots.pdf"),paper = "A4")
 plot(nimOutput)
 dev.off()
-    
+
 
 
 ## ------   2. SURVIVAL ~ TEMPERATURE -----
@@ -503,21 +519,27 @@ temp <- nimConstants$temp
 nimMat <- do.call(rbind, nimOutput)
 n.iter <- dim(nimMat)[1]
 beta.temp <- array(nimMat[ ,1:4], c(n.iter,2,2))
-logit.phi0 <- array(nimMat[ ,13:16], c(n.iter,2,2))
-PHI <- array(NA, c(n.iter,2,2,n.months))
+beta.time <- array(nimMat[ ,5:8], c(n.iter,2,2))
+logit.phi0 <- array(nimMat[ ,17:20], c(n.iter,2,2))
+PHI <- array(NA, c(n.iter,2,2,2,n.months))
 for(m in 1:n.months){
-  PHI[ ,1,1,m] <- ilogit(logit.phi0[ ,1,1] + beta.temp[ ,1,1] * temp[m]) # + beta.time[1,1] * m
-  PHI[ ,2,1,m] <- ilogit(logit.phi0[ ,2,1] + beta.temp[ ,2,1] * temp[m]) # + beta.time[2,1] * m
-  PHI[ ,1,2,m] <- ilogit(logit.phi0[ ,1,2] + beta.temp[ ,1,2] * temp[m]) # + beta.time[1,2] * m
-  PHI[ ,2,2,m] <- ilogit(logit.phi0[ ,2,2] + beta.temp[ ,2,2] * temp[m]) # + beta.time[2,2] * m
+  PHI[ ,1,1,1,m] <- ilogit(logit.phi0[ ,1,1,1] + beta.temp[ ,1,1] * temp[m] + beta.time[ ,1,1] * m)
+  PHI[ ,2,1,1,m] <- ilogit(logit.phi0[ ,2,1,1] + beta.temp[ ,2,1] * temp[m] + beta.time[ ,2,1] * m)
+  PHI[ ,1,2,1,m] <- ilogit(logit.phi0[ ,1,2,1] + beta.temp[ ,1,2] * temp[m] + beta.time[ ,1,2] * m)
+  PHI[ ,2,2,1,m] <- ilogit(logit.phi0[ ,2,2,1] + beta.temp[ ,2,2] * temp[m] + beta.time[ ,2,2] * m)
+  PHI[ ,1,1,2,m] <- ilogit(logit.phi0[ ,1,1,2] + beta.temp[ ,1,1] * temp[m] + beta.time[ ,1,1] * m)
+  PHI[ ,2,1,2,m] <- ilogit(logit.phi0[ ,2,1,2] + beta.temp[ ,2,1] * temp[m] + beta.time[ ,2,1] * m)
+  PHI[ ,1,2,2,m] <- ilogit(logit.phi0[ ,1,2,2] + beta.temp[ ,1,2] * temp[m] + beta.time[ ,1,2] * m)
+  PHI[ ,2,2,2,m] <- ilogit(logit.phi0[ ,2,2,2] + beta.temp[ ,2,2] * temp[m] + beta.time[ ,2,2] * m)
 }# months
 
-mean.PHI <- apply(PHI, c(2,3,4), mean)
-upper.PHI <- apply(PHI, c(2,3,4), function(x)quantile(x,0.975))
-lower.PHI <- apply(PHI, c(2,3,4), function(x)quantile(x,0.025))
+mean.PHI <- apply(PHI, c(2,3,4,5), mean)
+upper.PHI <- apply(PHI, c(2,3,4,5), function(x)quantile(x,0.975))
+lower.PHI <- apply(PHI, c(2,3,4,5), function(x)quantile(x,0.025))
+
 
 pdf(file.path(analysisDir, modelName,"survivalProbabilities.pdf"),
-   width = 12, height = 7)
+    width = 12, height = 7)
 par(mfrow = c(1,2))
 ## FEMALES
 plot(1, type = "n", xlim = c(0,n.months+1), ylim = c(0, 1), axes = F,

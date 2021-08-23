@@ -1,7 +1,7 @@
-########################################################
-##### ------------ MANDENA MICROCEBE ------------- #####
-##### SIMULTANEOUS ANALYSIS for MULTIPLE FRAGMENTS #####
-########################################################
+#######################################################
+##### ------------ MANDENA MICROCEBE ------------ #####
+##### PRELIMINARY ANALYSIS for MULTIPLE FRAGMENTS #####
+#######################################################
 rm(list = ls())
 
 ## ------ LIBRARIES ------
@@ -16,7 +16,7 @@ library(nimble)
 
 ## ------ WORKING DIRECTORIES ------
 source("workingDirectories.R")
-modelName <- "microcebe_temperature"
+modelName <- "microcebe_precipitation"
 source("C:/My_documents/RovQuant/Temp/PD/FUNCTIONS/FunctionScripts/wildMap.R")
 myCols <- wildMap(4)
 
@@ -102,7 +102,7 @@ weather$MONTH <- rep(1:12,22)
 names(weather)
 
 weather <- weather[ ,c("YEAR", "MONTH", "T", "TM", "Tm", "PP", "DAYS_WITH_DATA")]
-plot(weather$MONTH,weather$T)
+plot(weather$MONTH, weather$T)
 
 weather$meanPP <- weather$PP/weather$DAYS_WITH_DATA
 plot(weather$MONTH,weather$meanPP)
@@ -117,24 +117,18 @@ names(capture_sessions)
 
 
 ## ------   4. Clean data for each fragment ------
-## Identify first year of capture
 minYear <- min(capture_sessions$start.year)
-## Identify last year of capture
 maxYear <- max(capture_sessions$start.year)
-## Identify first month of capture in the first year
 minMonth <- min(capture_sessions$start.month[capture_sessions$start.year == minYear])
 firstMonth <- min(capture_sessions$start.month[capture_sessions$start.year == minYear])
-## Identify last month of capture in the last year
 lastMonth <- max(capture_sessions$start.month[capture_sessions$start.year == maxYear])
 
-## Store data for each fragment in a list
 data_list <- list()
 n.fragments <- length(fragments)
-
 for(f in 1:n.fragments){
   data_list[[f]] <- list()
   
-  ##-- Subset data & capture sessions to fragment "s"
+  ##-- Subset to fragment "s"
   print(fragments[f])
   thisData <- capture_data[capture_data$site == fragments[f], ]
   thisSessions <- capture_sessions[capture_sessions$site == fragments[f], ]
@@ -259,6 +253,7 @@ for(f in 1:n.fragments){
 names(data_list) <- fragments
 
 
+
 ## ------   5. Format data in arrays ------
 ##-- Extract the number of ids detected per fragment
 n.individuals <- unlist(lapply(data_list, function(x)x$n.individuals))
@@ -275,9 +270,9 @@ maxMonth <- max(months)
 ##-- Put into ragged arrays
 y <- array(NA, c(maxIDs, maxSessions, n.fragments))
 sex <- first <- matrix(NA, nrow = maxIDs, ncol = length(data_list))
-start.int <- end.int <- duration <- seas <- temp2 <- matrix( NA,
-                                                    nrow = maxSessions,
-                                                    ncol = length(data_list))
+start.int <- end.int <- duration <- seas <- temp2 <- precip2 <- matrix( NA,
+                                                             nrow = maxSessions,
+                                                             ncol = length(data_list))
 for(f in 1:length(data_list)){
   y[1:n.individuals[f],1:n.sessions[f],f] <- data_list[[f]]$CH
   sex[1:n.individuals[f],f] <- data_list[[f]]$sex
@@ -287,6 +282,7 @@ for(f in 1:length(data_list)){
   duration[1:n.sessions[f],f] <- data_list[[f]]$duration
   seas[1:n.sessions[f],f] <- data_list[[f]]$seas
   temp2[1:n.sessions[f],f] <- data_list[[f]]$temp2
+  precip2[1:n.sessions[f],f] <- data_list[[f]]$precip
 }#f
 
 ##-- Identify seasons for each month of the study
@@ -301,7 +297,7 @@ season <- season[minMonth:(maxMonth + minMonth - 1)]
 weather$index <- (weather$YEAR-minYear)*12 + weather$MONTH- minMonth  + 1
 temp <- weather$T[weather$index >= 1 & weather$index <= maxMonth]
 precip <- weather$meanPP[weather$index >= 1 & weather$index <= maxMonth]
-  
+
 ##-- Identify protection status for each fragment
 status <- c(1,1,2,2,2,2,2,1)
 
@@ -316,23 +312,23 @@ nimModel <- nimbleCode({
   logit.phi0[2,1] ~ dnorm(0,0.01)  ## Baseline survival male/disturbed
   logit.phi0[1,2] ~ dnorm(0,0.01)  ## Baseline survival female/protected
   logit.phi0[2,2] ~ dnorm(0,0.01)  ## Baseline survival male/protected
-
+  
   # beta.time[1,1] ~ dnorm(0,0.01) ## Temporal effect female/disturbed
   # beta.time[2,1] ~ dnorm(0,0.01) ## Temporal effect male/disturbed
   # beta.time[1,2] ~ dnorm(0,0.01) ## Temporal effect female/protected
   # beta.time[2,2] ~ dnorm(0,0.01) ## Temporal effect male/protected
-   
-  beta.temp[1,1] ~ dnorm(0,0.01) ## Temperature effect female/disturbed
-  beta.temp[2,1] ~ dnorm(0,0.01) ## Temperature effect male/disturbed
-  beta.temp[1,2] ~ dnorm(0,0.01) ## Temperature effect female/protected
-  beta.temp[2,2] ~ dnorm(0,0.01) ## Temperature effect male/protected
+  
+  beta.precip[1,1] ~ dnorm(0,0.01) ## Temperature effect female/disturbed
+  beta.precip[2,1] ~ dnorm(0,0.01) ## Temperature effect male/disturbed
+  beta.precip[1,2] ~ dnorm(0,0.01) ## Temperature effect female/protected
+  beta.precip[2,2] ~ dnorm(0,0.01) ## Temperature effect male/protected
   
   
   for(m in 1:n.months){
-    logit(PHI[1,1,m]) <- logit.phi0[1,1] + beta.temp[1,1] * temp[m] # + beta.time[1,1] * m
-    logit(PHI[2,1,m]) <- logit.phi0[2,1] + beta.temp[2,1] * temp[m] # + beta.time[2,1] * m
-    logit(PHI[1,2,m]) <- logit.phi0[1,2] + beta.temp[1,2] * temp[m] # + beta.time[1,2] * m
-    logit(PHI[2,2,m]) <- logit.phi0[2,2] + beta.temp[2,2] * temp[m] # + beta.time[2,2] * m
+    logit(PHI[1,1,m]) <- logit.phi0[1,1] + beta.precip[1,1] * precip[m] # + beta.time[1,1] * m
+    logit(PHI[2,1,m]) <- logit.phi0[2,1] + beta.precip[2,1] * precip[m] # + beta.time[2,1] * m
+    logit(PHI[1,2,m]) <- logit.phi0[1,2] + beta.precip[1,2] * precip[m] # + beta.time[1,2] * m
+    logit(PHI[2,2,m]) <- logit.phi0[2,2] + beta.precip[2,2] * precip[m] # + beta.time[2,2] * m
   }# months
   
   ## Multi-sites model
@@ -356,17 +352,17 @@ nimModel <- nimbleCode({
   lambda0[2,1] ~ dnorm(0,0.01) ## Detection Hazard rate male/disturbed
   lambda0[1,2] ~ dnorm(0,0.01) ## Detection Hazard rate female/protected
   lambda0[2,2] ~ dnorm(0,0.01) ## Detection Hazard rate male/protected
-  gamma.temp[1,1] ~ dnorm(0,0.01) ## Detection Hazard rate female/disturbed/dry
-  gamma.temp[2,1] ~ dnorm(0,0.01) ## Detection Hazard rate male/disturbed/dry
-  gamma.temp[1,2] ~ dnorm(0,0.01) ## Detection Hazard rate female/protected/dry
-  gamma.temp[2,2] ~ dnorm(0,0.01) ## Detection Hazard rate male/protected/dry
+  gamma.precip[1,1] ~ dnorm(0,0.01) ## Detection Hazard rate female/disturbed/dry
+  gamma.precip[2,1] ~ dnorm(0,0.01) ## Detection Hazard rate male/disturbed/dry
+  gamma.precip[1,2] ~ dnorm(0,0.01) ## Detection Hazard rate female/protected/dry
+  gamma.precip[2,2] ~ dnorm(0,0.01) ## Detection Hazard rate male/protected/dry
   
   ## Multi-sites model
   for(f in 1:n.fragments){
     for(t in 1:n.sessions[f]){
       ## Allows for unequal sampling sessions (sessionDuration[t])
-      log(lambda[1,t,f]) <- lambda0[1,status[f]] + gamma.temp[1,status[f]] * temp2[t,f]
-      log(lambda[2,t,f]) <- lambda0[2,status[f]] + gamma.temp[2,status[f]] * temp2[t,f]
+      log(lambda[1,t,f]) <- lambda0[1,status[f]] + gamma.precip[1,status[f]] * precip2[t,f]
+      log(lambda[2,t,f]) <- lambda0[2,status[f]] + gamma.precip[2,status[f]] * precip2[t,f]
       p[1,t,f] <- 1-exp(-lambda[1,t,f] * duration[t,f]) 
       p[2,t,f] <- 1-exp(-lambda[2,t,f] * duration[t,f]) 
     }# session
@@ -390,8 +386,8 @@ nimConstants <- list( n.individuals = n.individuals,
                       n.sessions = n.sessions,
                       n.months = maxMonth,
                       sex = sex,
-                      temp = temp,
-                      temp2 = temp2,
+                      precip = precip,
+                      precip2 = precip2,
                       status = status,
                       first = first,
                       start.int = start.int,
@@ -413,11 +409,11 @@ for(f in 1:n.fragments){
 nimInits <- list( z = z.init,
                   logit.phi0 = matrix(2.5,2,2),
                   # beta.time = matrix(0,2,2),
-                  beta.temp = matrix(0,2,2),
+                  beta.precip = matrix(0,2,2),
                   lambda0 = matrix(0,2,2),
-                  gamma.temp = matrix(0,2,2))
+                  gamma.precip = matrix(0,2,2))
 
-nimParams <- c("logit.phi0", "beta.temp", "gamma.temp", "lambda0")#"beta.time"
+nimParams <- c("logit.phi0", "beta.precip", "gamma.precip", "lambda0")#"beta.time"
 
 
 
@@ -456,7 +452,7 @@ for(c in 1:4){
   ##-- Compile and Run MCMC
   ## Finally, we compile both the model and MCMC objects and execute the 
   ## compiled MCMC for 50 000 iterations and 3 chains.
-  # Cmodel <- compileNimble(Rmodel)
+  #Cmodel <- compileNimble(Rmodel)
   Cmcmc <- compileNimble(Rmcmc, project = Rmodel)
   MCMC_runtime <- system.time(
     nimOutput <- runMCMC( Cmcmc,
@@ -478,46 +474,27 @@ for(c in 1:4){
 
 ## -----------------------------------------------------------------------------
 ## ------ III. EXPLORE OUTPUTS -----
-## ------   1. TRACEPLOTS -----
-outputs <- list.files(file.path(analysisDir,modelName,"outFiles"))
-
-nimOutput <- mcmc.list()
-for(i in 1:length(outputs)){
-  load(file.path(analysisDir,modelName,"outFiles",outputs[i]))
-  nimOutput[[i]] <- as.mcmc(myNimbleOutput)
-}
-
-pdf(file = file.path(analysisDir,modelName,"Traceplots.pdf"),paper = "A4")
-plot(nimOutput)
-dev.off()
-    
-
-
-## ------   2. SURVIVAL ~ TEMPERATURE -----
-load(file = file.path(analysisDir,
-                      modelName,
-                      "inFiles",
-                      paste0(modelName,"1.RData")))
+load(file = file.path(resultDir, "multiFragments.RData"))
 n.months <- nimConstants$n.months
-temp <- nimConstants$temp
 nimMat <- do.call(rbind, nimOutput)
 n.iter <- dim(nimMat)[1]
-beta.temp <- array(nimMat[ ,1:4], c(n.iter,2,2))
-logit.phi0 <- array(nimMat[ ,13:16], c(n.iter,2,2))
+beta <- array(nimMat[ ,1:4], c(n.iter,2,2))
+phi0 <- array(nimMat[ ,13:20], c(n.iter,2,2,2))
 PHI <- array(NA, c(n.iter,2,2,n.months))
 for(m in 1:n.months){
-  PHI[ ,1,1,m] <- ilogit(logit.phi0[ ,1,1] + beta.temp[ ,1,1] * temp[m]) # + beta.time[1,1] * m
-  PHI[ ,2,1,m] <- ilogit(logit.phi0[ ,2,1] + beta.temp[ ,2,1] * temp[m]) # + beta.time[2,1] * m
-  PHI[ ,1,2,m] <- ilogit(logit.phi0[ ,1,2] + beta.temp[ ,1,2] * temp[m]) # + beta.time[1,2] * m
-  PHI[ ,2,2,m] <- ilogit(logit.phi0[ ,2,2] + beta.temp[ ,2,2] * temp[m]) # + beta.time[2,2] * m
+  PHI[ ,1,1,m] <- ilogit(logit(phi0[ ,1,1,season[m]]) + beta[ ,1,1] * m)
+  PHI[ ,1,2,m] <- ilogit(logit(phi0[ ,1,2,season[m]]) + beta[ ,1,2] * m)
+  PHI[ ,2,1,m] <- ilogit(logit(phi0[ ,2,1,season[m]]) + beta[ ,2,1] * m)
+  PHI[ ,2,2,m] <- ilogit(logit(phi0[ ,2,2,season[m]]) + beta[ ,2,2] * m)
 }# months
+
 
 mean.PHI <- apply(PHI, c(2,3,4), mean)
 upper.PHI <- apply(PHI, c(2,3,4), function(x)quantile(x,0.975))
 lower.PHI <- apply(PHI, c(2,3,4), function(x)quantile(x,0.025))
 
-pdf(file.path(analysisDir, modelName,"survivalProbabilities.pdf"),
-   width = 12, height = 7)
+pdf(file.path(resultDir,"02_Multi fragments/survivalProbabilities.pdf"),
+    width = 12, height = 7)
 par(mfrow = c(1,2))
 ## FEMALES
 plot(1, type = "n", xlim = c(0,n.months+1), ylim = c(0, 1), axes = F,

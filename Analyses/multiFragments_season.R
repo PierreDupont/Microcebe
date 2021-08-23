@@ -16,6 +16,9 @@ library(nimble)
 
 ## ------ WORKING DIRECTORIES ------
 source("workingDirectories.R")
+modelName <- "microcebe_season"
+source("C:/My_documents/RovQuant/Temp/PD/FUNCTIONS/FunctionScripts/wildMap.R")
+myCols <- wildMap(4)
 
 
 ## -----------------------------------------------------------------------------
@@ -267,8 +270,8 @@ status <- c(1,1,2,2,2,2,2,1)
 
 
 ## -----------------------------------------------------------------------------
-## ------ II. NIMBLE MODEL ------
-##-- Write the CR model in NIMBLE
+## ------ II. NIMBLE ------
+## ------   1. MODEL ------
 nimModel <- nimbleCode({
 
   ## DEMOGRAPHIC PROCESS 
@@ -336,6 +339,8 @@ nimModel <- nimbleCode({
 })
 
 
+
+## ------   2. DATA ------
 ##-- Format the data for NIMBLE
 nimData <- list( y = y)
 
@@ -370,43 +375,66 @@ nimInits <- list( z = z.init,
                   beta = matrix(0,2,2),
                   lambda = array(0.5,c(2,2,2)))
 
+nimParams <- c("phi0", "lambda", "beta")
 
-##-- Create a NIMBLE model object
-Rmodel <- nimbleModel( code = nimModel,
-                       constants = nimConstants,
-                       data = nimData,
-                       inits = nimInits,
-                       calculate = F)
-Rmodel$calculate()
 
-##-- Configure and Build MCMC objects
-conf <- configureMCMC(Rmodel, monitors = c("phi0", "beta", "lambda"), print = FALSE)
-Rmcmc <- buildMCMC(conf)
 
-##-- Compile and Run MCMC
-## Finally, we compile both the model and MCMC objects and execute the compiled 
-## MCMC for 50 000 iterations and 3 chains.
-Cmodel <- compileNimble(Rmodel)
-Cmcmc <- compileNimble(Rmcmc, project = Rmodel)
-MCMC_runtime <- system.time(
-  nimOutput <- runMCMC( Cmcmc,
-                        niter = 16000,
-                        nburnin = 1000,
-                        nchains = 3,
-                        thin = 1,
-                        samplesAsCodaMCMC = T)
-)
-plot(nimOutput)
-save(nimOutput, MCMC_runtime,
-     file = file.path(resultDir, "multiFragments.RData"))
+## ------   3. SAVE INPUT ------
+for(c in 1:4){
+  save(nimModel,
+       nimData,
+       nimConstants,
+       nimInits,
+       nimParams, 
+       file = file.path(analysisDir,
+                         modelName,
+                        "inFiles",
+                         paste0(modelName,c,".RData")))
+}#c
+
+
+
+## ------   4. FIT ------
+for(c in 1:4){
+  
+  ##-- Create a NIMBLE model object
+  Rmodel <- nimbleModel( code = nimModel,
+                         constants = nimConstants,
+                         data = nimData,
+                         inits = nimInits,
+                         calculate = F)
+  Rmodel$calculate()
+  
+  ##-- Configure and Build MCMC objects
+  conf <- configureMCMC(Rmodel,
+                        monitors = nimParams,
+                        print = FALSE)
+  Rmcmc <- buildMCMC(conf)
+  
+  ##-- Compile and Run MCMC
+  ## Finally, we compile both the model and MCMC objects and execute the 
+  ## compiled MCMC for 50 000 iterations and 3 chains.
+  Cmodel <- compileNimble(Rmodel)
+  Cmcmc <- compileNimble(Rmcmc, project = Rmodel)
+  MCMC_runtime <- system.time(
+    nimOutput <- runMCMC( Cmcmc,
+                          niter = 30000,
+                          nburnin = 10000,
+                          nchains = 1,
+                          thin = 1,
+                          samplesAsCodaMCMC = T))
+  plot(nimOutput)
+  save(nimOutput,
+       MCMC_runtime,
+       file = file.path(analysisDir,
+                        modelName, 
+                        paste0("outFiles/output_",c,".RData")))
+}#c
 
 
 
 ## -----------------------------------------------------------------------------
 ## ------ III. EXPLORE OUTPUTS -----
-source("C:/My_documents/RovQuant/Temp/PD/FUNCTIONS/FunctionScripts/wildMap.R")
-myCols <- wildMap(4)
-
 load(file = file.path(resultDir, "multiFragments.RData"))
 n.months <- nimConstants$n.months
 nimMat <- do.call(rbind, nimOutput)
