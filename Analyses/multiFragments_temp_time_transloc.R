@@ -312,41 +312,36 @@ status <- c(1,1,2,2,2,2,2,1)
 nimModel <- nimbleCode({
   
   ## DEMOGRAPHIC PROCESS 
-  logit.phi0[1,1,1] ~ dnorm(0,0.01)  ## Baseline survival female/disturbed
-  logit.phi0[2,1,1] ~ dnorm(0,0.01)  ## Baseline survival male/disturbed
-  logit.phi0[1,2,1] ~ dnorm(0,0.01)  ## Baseline survival female/protected
-  logit.phi0[2,2,1] ~ dnorm(0,0.01)  ## Baseline survival male/protected
+  logit.phi0[1,1] ~ dnorm(0,0.01) ## Baseline survival female/disturbed
+  logit.phi0[2,1] ~ dnorm(0,0.01) ## Baseline survival male/disturbed
+  logit.phi0[1,2] ~ dnorm(0,0.01) ## Baseline survival female/protected
+  logit.phi0[2,2] ~ dnorm(0,0.01) ## Baseline survival male/protected
+  
+  beta.time[1,1] ~ dnorm(0,0.01)  ## Temporal effect female/disturbed
+  beta.time[2,1] ~ dnorm(0,0.01)  ## Temporal effect male/disturbed
+  beta.time[1,2] ~ dnorm(0,0.01)  ## Temporal effect female/protected
+  beta.time[2,2] ~ dnorm(0,0.01)  ## Temporal effect male/protected
+  
+  beta.temp[1,1] ~ dnorm(0,0.01)  ## Temperature effect female/disturbed
+  beta.temp[2,1] ~ dnorm(0,0.01)  ## Temperature effect male/disturbed
+  beta.temp[1,2] ~ dnorm(0,0.01)  ## Temperature effect female/protected
+  beta.temp[2,2] ~ dnorm(0,0.01)  ## Temperature effect male/protected
   
   beta.transloc ~ dnorm(0,0.01)
   
-  logit.phi0[1,1,2] <- logit.phi0[1,1,1] + beta.transloc  ## Baseline survival female/disturbed/translocated
-  logit.phi0[2,1,2] <- logit.phi0[2,1,1] + beta.transloc   ## Baseline survival male/disturbed/translocated
-  logit.phi0[1,2,2] <- logit.phi0[1,2,1] + beta.transloc   ## Baseline survival female/protected/translocated
-  logit.phi0[2,2,2] <- logit.phi0[2,2,1] + beta.transloc   ## Baseline survival male/protected/translocated
-  
-  beta.time[1,1] ~ dnorm(0,0.01) ## Temporal effect female/disturbed
-  beta.time[2,1] ~ dnorm(0,0.01) ## Temporal effect male/disturbed
-  beta.time[1,2] ~ dnorm(0,0.01) ## Temporal effect female/protected
-  beta.time[2,2] ~ dnorm(0,0.01) ## Temporal effect male/protected
-  
-  beta.temp[1,1] ~ dnorm(0,0.01) ## Temperature effect female/disturbed
-  beta.temp[2,1] ~ dnorm(0,0.01) ## Temperature effect male/disturbed
-  beta.temp[1,2] ~ dnorm(0,0.01) ## Temperature effect female/protected
-  beta.temp[2,2] ~ dnorm(0,0.01) ## Temperature effect male/protected
-  
-  
+  ## Monthly survival probabilities
   for(m in 1:n.months){
-    logit(PHI[1,1,1,m]) <- logit.phi0[1,1,1] + beta.temp[1,1] * temp[m] + beta.time[1,1] * m
-    logit(PHI[2,1,1,m]) <- logit.phi0[2,1,1] + beta.temp[2,1] * temp[m] + beta.time[2,1] * m
-    logit(PHI[1,2,1,m]) <- logit.phi0[1,2,1] + beta.temp[1,2] * temp[m] + beta.time[1,2] * m
-    logit(PHI[2,2,1,m]) <- logit.phi0[2,2,1] + beta.temp[2,2] * temp[m] + beta.time[2,2] * m
-    logit(PHI[1,1,2,m]) <- logit.phi0[1,1,2] + beta.temp[1,1] * temp[m] + beta.time[1,1] * m
-    logit(PHI[2,1,2,m]) <- logit.phi0[2,1,2] + beta.temp[2,1] * temp[m] + beta.time[2,1] * m
-    logit(PHI[1,2,2,m]) <- logit.phi0[1,2,2] + beta.temp[1,2] * temp[m] + beta.time[1,2] * m
-    logit(PHI[2,2,2,m]) <- logit.phi0[2,2,2] + beta.temp[2,2] * temp[m] + beta.time[2,2] * m
+    logit(PHI[1,1,1,m]) <- logit.phi0[1,1] + beta.temp[1,1] * temp[m] + beta.time[1,1] * m
+    logit(PHI[2,1,1,m]) <- logit.phi0[2,1] + beta.temp[2,1] * temp[m] + beta.time[2,1] * m
+    logit(PHI[1,2,1,m]) <- logit.phi0[1,2] + beta.temp[1,2] * temp[m] + beta.time[1,2] * m
+    logit(PHI[2,2,1,m]) <- logit.phi0[2,2] + beta.temp[2,2] * temp[m] + beta.time[2,2] * m
+    logit(PHI[1,1,2,m]) <- logit(PHI[1,1,1,m]) + beta.transloc
+    logit(PHI[2,1,2,m]) <- logit(PHI[2,1,1,m]) + beta.transloc
+    logit(PHI[1,2,2,m]) <- logit(PHI[1,2,1,m]) + beta.transloc
+    logit(PHI[2,2,2,m]) <- logit(PHI[2,2,1,m]) + beta.transloc
   }# months
   
-  ## Multi-sites model
+  ## Multi-fragments model
   for(f in 1:n.fragments){
     for(t in 1:n.intervals[f]){
       phi[1,1,t,f] <- prod(PHI[1,1,status[f],start.int[t,f]:end.int[t,f]])
@@ -365,16 +360,16 @@ nimModel <- nimbleCode({
   
   
   ## DETECTION PROCESS
-  lambda0[1,1] ~ dnorm(0,0.01) ## Detection Hazard rate female/disturbed
-  lambda0[2,1] ~ dnorm(0,0.01) ## Detection Hazard rate male/disturbed
-  lambda0[1,2] ~ dnorm(0,0.01) ## Detection Hazard rate female/protected
-  lambda0[2,2] ~ dnorm(0,0.01) ## Detection Hazard rate male/protected
-  gamma.temp[1,1] ~ dnorm(0,0.01) ## Detection Hazard rate female/disturbed/dry
-  gamma.temp[2,1] ~ dnorm(0,0.01) ## Detection Hazard rate male/disturbed/dry
-  gamma.temp[1,2] ~ dnorm(0,0.01) ## Detection Hazard rate female/protected/dry
-  gamma.temp[2,2] ~ dnorm(0,0.01) ## Detection Hazard rate male/protected/dry
+  lambda0[1,1] ~ dnorm(0,0.01)    ## Detection Hazard rate female/disturbed
+  lambda0[2,1] ~ dnorm(0,0.01)    ## Detection Hazard rate male/disturbed
+  lambda0[1,2] ~ dnorm(0,0.01)    ## Detection Hazard rate female/protected
+  lambda0[2,2] ~ dnorm(0,0.01)    ## Detection Hazard rate male/protected
+  gamma.temp[1,1] ~ dnorm(0,0.01) ## Detection Hazard rate female/disturbed
+  gamma.temp[2,1] ~ dnorm(0,0.01) ## Detection Hazard rate male/disturbed
+  gamma.temp[1,2] ~ dnorm(0,0.01) ## Detection Hazard rate female/protected
+  gamma.temp[2,2] ~ dnorm(0,0.01) ## Detection Hazard rate male/protected
   
-  ## Multi-sites model
+  ## Multi-fragments model
   for(f in 1:n.fragments){
     for(t in 1:n.sessions[f]){
       ## Allows for unequal sampling sessions (sessionDuration[t])
@@ -425,7 +420,7 @@ for(f in 1:n.fragments){
 }#i
 
 nimInits <- list( z = z.init,
-                  logit.phi0 = array(2.5,c(2,2,2)),
+                  logit.phi0 = matrix(2.5,2,2),
                   beta.time = matrix(0,2,2),
                   beta.temp = matrix(0,2,2),
                   beta.transloc = 0,
