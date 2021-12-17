@@ -518,7 +518,7 @@ upper.PHI <- apply(PHI, c(2,3,4), function(x)quantile(x,0.975))
 lower.PHI <- apply(PHI, c(2,3,4), function(x)quantile(x,0.025))
 
 
-pdf(file.path(analysisDir, modelName,"survivalProbabilities.pdf"),
+pdf(file.path(analysisDir, modelName, "survivalProbabilities.pdf"),
    width = 12, height = 7)
 par(mfrow = c(1,2))
 ## FEMALES
