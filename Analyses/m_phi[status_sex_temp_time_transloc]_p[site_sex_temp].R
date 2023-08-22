@@ -12,6 +12,7 @@ library(purrr)
 library(plyr)
 library(coda)
 library(nimble)
+library(xtable)
 
 
 ## ------ WORKING DIRECTORIES ------
@@ -340,7 +341,7 @@ precip <- weather$meanPP[weather$index >= 1 & weather$index <= maxMonth]
 ## ------   1. MODEL ------
 nimModel <- nimbleCode({
   
-  ## DEMOGRAPHIC PROCESS 
+  ## DEMOGRAPHIC PROCESS
   for(d in 1:2){
     for(s in 1:2){
       logit.phi0[d,s] ~ dnorm(0,0.01)     ## Baseline survival[site,sex]
@@ -349,12 +350,12 @@ nimModel <- nimbleCode({
       beta.transloc[d,s] ~ dnorm(0,0.01)  ## Translocation effect[site,sex]
       for(m in 1:n.months){
         logit(PHI[d,s,1,m]) <- logit.phi0[d,s] +
-          beta.temp[d,s] * temp[m] + 
-          beta.time[d,s] * month[m] 
+          beta.temp[d,s] * temp[m] +
+          beta.time[d,s] * month[m]
         logit(PHI[d,s,2,m]) <- logit.phi0[d,s] +
-          beta.temp[d,s] * temp[m] + 
+          beta.temp[d,s] * temp[m] +
           beta.time[d,s] * month[m] +
-          beta.transloc[d,s]     
+          beta.transloc[d,s]
       }#m
     }#ss
   }#s
@@ -365,7 +366,7 @@ nimModel <- nimbleCode({
     z[i,1] ~ dbern(1)
     for(t in 1:n.intervals[i]){
       phi[i,t] <- prod(PHI[status[i],sex[i],transloc[i],start.int[i,t]:end.int[i,t]])
-      z[i,t+1] ~ dbern(z[i,t] * phi[i,t])  
+      z[i,t+1] ~ dbern(z[i,t] * phi[i,t])
     }#t
   }#i
   
@@ -382,11 +383,11 @@ nimModel <- nimbleCode({
   for(i in 1:n.individuals){
     for(t in 2:n.sessions[i]){
       log(lambda[i,t]) <- lambda0[site[i],sex[i]] + gamma.temp[site[i],sex[i]] * temp2[i,t]
-      p[i,t] <- 1-exp(-lambda[i,t] * duration[i,t]) 
+      p[i,t] <- 1-exp(-lambda[i,t] * duration[i,t])
       y[i,t] ~ dbern(p[i,t] * z[i,t])
     }#t
   }#i
-})
+}) 
 
 
 
@@ -401,8 +402,8 @@ for(i in 1:n.individuals){
   }
 }#i
 
-nimData <- list(y = y,
-                z = z.data)
+nimData <- list( y = y,
+                 z = z.data)
 
 nimConstants <- list( n.individuals = n.individuals,
                       n.intervals = n.sessions-1,
@@ -430,9 +431,9 @@ nimInits <- list( z = z.init,
                   lambda0 = matrix(-1,8,2),
                   gamma.temp = matrix(0,8,2))
 
-nimParams <- c("logit.phi0",
-               "beta.temp", "beta.time", "beta.transloc",
-               "gamma.temp", "lambda0")
+nimParams <- c( "logit.phi0",
+                "beta.temp", "beta.time", "beta.transloc",
+                "gamma.temp", "lambda0")
 
 
 
@@ -503,10 +504,55 @@ for(i in 1:length(outputs)){
 }
 nimOutput <- nimOutput2
 
-pdf(file = file.path(analysisDir, modelName, "Traceplots.pdf"), paper = "A4")
+pdf(file = file.path(analysisDir, modelName, "Traceplots.pdf"))
 plot(nimOutput)
 dev.off()
 
+
+
+## ------   2. TABLES -----
+source(file.path(analysisDir, "ProcessCodaOutput_v3.R"))
+
+results <- ProcessCodaOutput_v3(x = nimOutput) 
+
+##---- Create empty table
+survival <-  matrix(NA, nrow = 5, ncol = 4)
+rownames(survival) <- c("","phi0", "beta.time", "beta.temp", "beta.transloc")
+colnames(survival) <- c("Protected", "Protected", "Degraded", "Degraded")
+survival[1, ] <- c("F", "M", "F", "M")
+survival[2, ] <- paste0( round(plogis(results$mean$logit.phi0), 2),
+                         " (",  round(plogis(results$q2.5$logit.phi0),2),
+                         "-", round(plogis(results$q97.5$logit.phi0),2), ")")
+survival[3, ] <- paste0( round(plogis(results$mean$beta.time), 2),
+                         " (",  round(plogis(results$q2.5$beta.time),2),
+                         "-", round(plogis(results$q97.5$beta.time),2), ")")
+survival[4, ] <- paste0( round(plogis(results$mean$beta.temp), 2),
+                         " (",  round(plogis(results$q2.5$beta.temp),2),
+                         "-", round(plogis(results$q97.5$beta.temp),2), ")")
+survival[5, ] <- paste0( round(plogis(results$mean$beta.transloc), 2),
+                         " (",  round(plogis(results$q2.5$beta.transloc),2),
+                         "-", round(plogis(results$q97.5$beta.transloc),2), ")")
+
+addtorow <- list()
+addtorow$pos <- list(0, 0, c(2,4))
+addtorow$command <- c(paste0(paste0('& \\multicolumn{2}{c}{',
+                                    sort(unique(colnames(survival))),
+                                    '}', collapse = ''), '\\\\'),
+                      "\\rowcolor[gray]{.85}",
+                      "\\rowcolor[gray]{.95}")
+
+print(xtable(survival, type = "latex",
+             align = paste(c("l",rep("c",ncol(survival))),collapse = "")),
+      floating = FALSE,include.colnames=F, include.rownames = TRUE,
+      add.to.row = addtorow,
+      file = file.path(analysisDir, modelName, "Params.tex"))
+
+
+
+
+##----- Export as .csv
+write.csv( survival,
+          file =  file.path(analysisDir, modelName, "Params.csv"))
 
 
 ## ------   2. SURVIVAL ~ TEMPERATURE -----
@@ -591,7 +637,6 @@ n.iter <- dim(nimMat)[1]
 gamma.temp <- array(nimMat[ ,grep("gamma.temp",dimnames(nimMat)[[2]])], c(n.iter,8,2))
 lambda0 <- array(nimMat[ ,grep("lambda0",dimnames(nimMat)[[2]])], c(n.iter,8,2))
 P <- array(NA, c(n.iter,8,2,length(temp2)))
-
 for(t in 1:length(temp2)){
   for(s in 1:2){
     for(f in 1:8){
