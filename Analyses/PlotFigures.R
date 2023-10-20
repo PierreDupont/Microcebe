@@ -20,6 +20,8 @@ source("workingDirectories.R")
 modelName <- "m_phi[status_sex_temp_time_transloc]_p[site_sex_temp]"
 source("wildMap.R")
 myCols <- wildMap(4)
+source(file.path(analysisDir, "ProcessCodaOutput_v3.R"))
+source(file.path(analysisDir, "PlotViolins.R"))
 
 
 ## -----------------------------------------------------------------------------
@@ -40,7 +42,6 @@ nimOutput <- nimOutput2
 
 
 ## ------   2. PRINT TABLES -----
-source(file.path(analysisDir, "ProcessCodaOutput_v3.R"))
 
 results <- ProcessCodaOutput_v3(x = nimOutput) 
 
