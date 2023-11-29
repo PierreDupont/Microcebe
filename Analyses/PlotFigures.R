@@ -6,9 +6,9 @@ rm(list = ls())
 
 ## ------ LIBRARIES ------
 library(dplyr)
-library(tidyr)
+#library(tidyr)
 library(magrittr)
-library(purrr)
+#library(purrr)
 library(plyr)
 library(coda)
 library(nimble)
@@ -17,7 +17,7 @@ library(xtable)
 
 ## ------ WORKING DIRECTORIES ------
 source("workingDirectories.R")
-modelName <- "m_phi[status_sex_temp_time_transloc]_p[site_sex_temp]"
+modelName <- "m_phi[status_sex_temp_time_transloc]_p[site_sex_temp]_RJ"
 source("wildMap.R")
 myCols <- wildMap(4)
 source(file.path(analysisDir, "ProcessCodaOutput_v3.R"))
@@ -77,12 +77,10 @@ print(xtable(survival, type = "latex",
       add.to.row = addtorow,
       file = file.path(analysisDir, modelName, "Params.tex"))
 
-
-
-
 ##----- Export as .csv
 write.csv( survival,
            file =  file.path(analysisDir, modelName, "Params.csv"))
+
 
 
 ## ------   2. PLOT SURVIVAL -----
@@ -101,6 +99,11 @@ beta.time <- array(nimMat[ ,grep("beta.time",dimnames(nimMat)[[2]])], c(n.iter,2
 beta.transloc <- array(nimMat[ ,grep("beta.transloc",dimnames(nimMat)[[2]])], c(n.iter,2,2))
 logit.phi0 <- array(nimMat[ ,grep("logit.phi0",dimnames(nimMat)[[2]])], c(n.iter,8,2))
 PHI <- array(NA, c(n.iter,2,2,2,n.months))
+dimnames(PHI) <- list( iteration = 1:n.iter,
+                       status = c("protected","degraded"),
+                       sex = c("female","male"),
+                       translocated = c("no","yes"),
+                       month = 1:n.months)
 for(f in 1:2){
   for(m in 1:n.months){
     for(s in 1:2){
@@ -114,11 +117,25 @@ for(f in 1:2){
   }#m
 }# f
 
+##-- Identify first month w/ translocation
+test <- cbind.data.frame( 
+  transloc = nimConstants$transloc,
+  sex = nimConstants$sex,
+  status = nimConstants$status,
+  startM = nimConstants$start.int[ ,1]) %>%
+  filter(., transloc == 2)
+
+start <- matrix(NA,2,2)
+start[1,1] <- min(test$startM[test$status == 1 & test$sex == 1])
+start[1,2] <- min(test$startM[test$status == 1 & test$sex == 2])
+start[2,1] <- min(test$startM[test$status == 2 & test$sex == 1])
+start[2,2] <- min(test$startM[test$status == 2 & test$sex == 2])
+
+
+##-- Plot Survival
 mean.PHI <- apply(PHI, c(2,3,4,5), mean)
 upper.PHI <- apply(PHI, c(2,3,4,5), function(x)quantile(x,0.975))
 lower.PHI <- apply(PHI, c(2,3,4,5), function(x)quantile(x,0.025))
-
-
 pdf(file.path(analysisDir, modelName, "survivalProbabilities.pdf"),
     width = 10, height = 12)
 par(mfrow = c(2,2))
@@ -126,7 +143,10 @@ sex <- c("females", "males")
 status <- c("degraded", "protected")
 for(f in 1:2){
   for(s in 1:2){
-    plot(1, type = "n", xlim = c(0,n.months+1), ylim = c(0, 1), axes = F,
+    plot(1, type = "n",
+         xlim = c(0,n.months+1),
+         ylim = c(0, 1),
+         axes = F,
          ylab = "Survival prob.",
          xlab = "Months",
          main = paste0(status[f],"-", sex[s]))
@@ -141,15 +161,17 @@ for(f in 1:2){
     polygon(x = c(1:n.months,n.months:1),
             y = c(upper.PHI[f,s,1, ],rev(lower.PHI[f,s,1, ])),
             col = adjustcolor(myCols[2],alpha.f = 0.5), border = F)
-    points(1:n.months, mean.PHI[f,s,1,], type = "l", lwd = 2, col = myCols[2])
+    points(1:n.months, mean.PHI[f,s,1,1:n.months], type = "l", lwd = 2, col = myCols[2])
     
-    polygon(x = c(1:n.months,n.months:1),
-            y = c(upper.PHI[f,s,2, ],rev(lower.PHI[f,s,2, ])),
+    polygon(x = c(start[f,s]:n.months,n.months:start[f,s]),
+            y = c( upper.PHI[f,s,2,start[f,s]:n.months],
+                  rev(lower.PHI[f,s,2,start[f,s]:n.months])),
             col = adjustcolor(myCols[4],alpha.f = 0.5), border = F)
-    points(1:n.months, mean.PHI[f,s,2,], type = "l", lwd = 2, col = myCols[4])
+    points(start[f,s]:n.months, mean.PHI[f,s,2,start[f,s]:n.months], type = "l", lwd = 2, col = myCols[4])
   }#s
 }#f
 graphics.off()
+
 
 
 

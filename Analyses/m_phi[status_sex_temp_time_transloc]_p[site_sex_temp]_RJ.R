@@ -5,11 +5,11 @@
 rm(list = ls())
 
 ## ------ LIBRARIES ------
-library(dplyr)
-library(tidyr)
-library(magrittr)
-library(purrr)
 library(plyr)
+library(dplyr)
+#library(tidyr)
+#library(magrittr)
+#library(purrr)
 library(coda)
 library(nimble)
 library(xtable)
@@ -22,6 +22,9 @@ source("workingDirectories.R")
 modelName <- "m_phi[status_sex_temp_time_transloc]_p[site_sex_temp]_RJ"
 source("C:/My_documents/RovQuant/Temp/PD/FUNCTIONS/FunctionScripts/wildMap.R")
 myCols <- wildMap(4)
+source(file.path(analysisDir, "ProcessCodaOutput_v3.R"))
+source(file.path(analysisDir, "PlotViolins.R"))
+
 
 
 ## -----------------------------------------------------------------------------
@@ -154,7 +157,6 @@ firstMonth <- minMonth
 ## Identify last month of capture in the last year
 lastMonth <- max(capture_sessions$start.month[capture_sessions$start.year == maxYear])
 
-
 ## Identify unique individuals captured
 ## NOTE: remove individuals captured on the last session for the first time
 IDs <- unique(capture_data$transponder)
@@ -166,9 +168,6 @@ IDs <- unique(capture_data$transponder)
 #     toRemove[i] <- T
 #   }
 # }#i
-# 
-# 
-#   
 
 ## Store data for each individual in a list
 data_list <- list()
@@ -571,41 +570,34 @@ save(nimOutput,
 
 ## -----------------------------------------------------------------------------
 ## ------ III. PROCESS OUTPUTS -----
-load(file.path(analysisDir, modelName, "inFiles", paste0(modelName,"1.RData")))
-load(file.path(analysisDir, modelName, paste0("outFiles/output.RData")))
-load(file.path(analysisDir, modelName, paste0("outFiles/processed_output2.RData")))
-
-
 ## ------   1. Process and save MCMC samples -----
 # outputs <- list.files(file.path(analysisDir, modelName, "outFiles"))
-# #parm.index <- c(1,2,9,10,17,18,25,26,33,34,41,42,49:82,89,90)
 # nimOutput2 <- mcmc.list()
 # for(i in 1:length(outputs)){
 #   load(file.path(analysisDir,modelName,"outFiles",outputs[i]))
 #   nimOutput2[[i]] <- as.mcmc(nimOutput[, ])
+#   pdf(file = file.path(analysisDir, modelName, paste0("Traceplots_chain_",i,".pdf")))
+#   plot(nimOutput)
+#   dev.off()
 # }
 # nimOutput <- nimOutput2
 # 
-# pdf(file = file.path(analysisDir, modelName, "Traceplots2.pdf"))
+# pdf(file = file.path(analysisDir, modelName, "Traceplots.pdf"))
 # plot(nimOutput)
 # dev.off()
 # 
-# 
-# res <- ProcessCodaOutput(nimOutput)
+# res <- ProcessCodaOutput_v3(x = nimOutput) 
 # save(res, nimOutput,
-#      file = file.path(analysisDir,
-#                       modelName,
-#                       paste0("outFiles/processed_output2.RData")))
-##-- Load processed output
-load(file.path(analysisDir,
-               modelName,
-               paste0("outFiles/processed_output2.RData")))
+#      file = file.path(analysisDir, modelName, "output.RData"))
 
 ##-- Load model input
-load(file = file.path( analysisDir,
-                       modelName,
-                       "inFiles",
-                       paste0(modelName,"1.RData")))
+load(file.path(analysisDir, modelName, "inFiles", paste0(modelName,"1.RData")))
+
+##-- Load processed output
+load(file.path(analysisDir, modelName, "output.RData"))
+
+
+
 
 ## ------   2. RJ-MCMC PLOTS ------
 ##---- Get model features
@@ -703,7 +695,7 @@ aggr <- aggr[order(aggr$weight, decreasing = TRUE),]
 aggr$model <- factor(aggr$model, levels = aggr$model)
 reduced_aggr <- filter(aggr, weight >= 0.01)
 
-pdf(file.path(analysisDir, modelName, "results_RJ-MCMC2.pdf"),
+pdf(file.path(analysisDir, modelName, "results_RJ-MCMC.pdf"),
     width = 12, height = 14)
 ggplot(data = reduced_aggr,
        mapping =  aes(x = model, y = weight, alpha = weight)) +
@@ -713,26 +705,6 @@ ggplot(data = reduced_aggr,
     vjust = 1,
     hjust = 1
   )) + ylab("Weight") + xlab("Models")
-
-
-# ##---- COEFFICIENT TRACE PLOTS (OVERALL)
-# ggplot(data = betas.df, aes(
-#   x = iteration,
-#   y = value,
-#   color = factor(chain))) +
-#   geom_line() +
-#   facet_wrap(~ variable, scales = "free") +
-#   xlab("Iteration") +  theme(legend.position = "none")
-
-
-# ##---- COEFFICIENT TRACE PLOTS (MODEL-SPECIFIC)
-# ggplot(data = betas.df, aes(
-#   x = iteration.model,
-#   y = value,
-#   color = factor(chain))) +
-#   geom_line() +
-#   facet_grid(variable ~ model, margins = FALSE, scales = "free") +
-#   xlab("Iteration") +  theme(legend.position = "none")
 
 
 ##---- PLOT COEFFICIENT ESTIMATES (OVERALL)
@@ -760,6 +732,8 @@ dev.off()
 
 
 
+
+
 ## ------   3. SURVIVAL PLOTS (best model) -----
 n.months <- nimConstants$n.months
 temp <- nimConstants$temp
@@ -771,30 +745,34 @@ table(nimMat$variable)
 
 ##-- Females protected ----
 logit.phi0 <- nimMat$value[nimMat$variable %in% "lphi0.prot.f"]
-beta.temp <- nimMat$value[nimMat$variable %in% "time.prot.f"]
-beta.transloc <- nimMat$value[nimMat$variable %in% "time.prot.f"]
-beta.time <- nimMat$value[nimMat$variable %in% "time.prot.f"]
-
+beta.transloc <- nimMat$value[nimMat$variable %in% "transloc.prot.f"]
 n.iterations <- length(logit.phi0)
 phi.f.prot <- matrix(NA, n.iterations, n.months)
+phi.f.prot.t <- matrix(NA, n.iterations, n.months)
 for(m in 1:n.months){
-  phi.f.prot[ ,m] <- ilogit(logit.phi0 + beta.time * month[m])
+  phi.f.prot[ ,m] <- ilogit(logit.phi0)
+  phi.f.prot.t[ ,m] <- ilogit(logit.phi0 + beta.transloc)
 }#m
-mean.phi.f.prot <- mean.phi.f.prot.t <- apply(phi.f.prot, 2, mean)
-upper.phi.f.prot <- upper.phi.f.prot.t <- apply(phi.f.prot, 2, function(x)quantile(x,0.975))
-lower.phi.f.prot <- lower.phi.f.prot.t <- apply(phi.f.prot, 2, function(x)quantile(x,0.025))
+mean.phi.f.prot <- apply(phi.f.prot, 2, mean)
+upper.phi.f.prot <- apply(phi.f.prot, 2, function(x)quantile(x,0.975))
+lower.phi.f.prot <- apply(phi.f.prot, 2, function(x)quantile(x,0.025))
+
+mean.phi.f.prot.t <- apply(phi.f.prot.t, 2, mean)
+upper.phi.f.prot.t <- apply(phi.f.prot.t, 2, function(x)quantile(x,0.975))
+lower.phi.f.prot.t <- apply(phi.f.prot.t, 2, function(x)quantile(x,0.025))
+
+
 
 
 ##-- Females disturbed ----
 logit.phi0 <- nimMat$value[nimMat$variable %in% "lphi0.dist.f"]
-beta.time <- nimMat$value[nimMat$variable %in% "time.dist.f"]
 beta.transloc <- nimMat$value[nimMat$variable %in% "transloc.dist.f"]
 n.iterations <- length(logit.phi0)
 phi.f.dist <- matrix(NA, n.iterations, n.months)
 phi.f.dist.t <- matrix(NA, n.iterations, n.months)
 for(m in 1:n.months){
-  phi.f.dist[ ,m] <- ilogit(logit.phi0 + beta.time * month[m])
-  phi.f.dist.t[ ,m] <- ilogit(logit.phi0 + beta.time * month[m] + beta.transloc)
+  phi.f.dist[ ,m] <- ilogit(logit.phi0)
+  phi.f.dist.t[ ,m] <- ilogit(logit.phi0 + beta.transloc)
 }#m
 mean.phi.f.dist <- apply(phi.f.dist, 2, mean)
 upper.phi.f.dist <- apply(phi.f.dist, 2, function(x)quantile(x,0.975))
@@ -815,7 +793,6 @@ phi.m.prot.t <- matrix(NA, n.iterations, n.months)
 for(m in 1:n.months){
   phi.m.prot[ ,m] <- ilogit(logit.phi0) 
   phi.m.prot.t[ ,m] <- ilogit(logit.phi0 + beta.transloc)
-  
 }#m
 mean.phi.m.prot <- apply(phi.m.prot, 2, mean)
 upper.phi.m.prot <- apply(phi.m.prot, 2, function(x)quantile(x,0.975))
@@ -848,7 +825,7 @@ lower.phi.m.dist.t <- apply(phi.m.dist.t, 2, function(x)quantile(x,0.025))
 
 
 ##----
-pdf(file.path(analysisDir, modelName, "survivalProbabilities_best model2.pdf"),
+pdf(file.path(analysisDir, modelName, "survivalProbabilities_best model.pdf"),
     width = 10, height = 10)
 par(mfrow = c(2,2))
 ##-- Females protected plot ----
@@ -928,7 +905,7 @@ dev.off()
 
 
 
-## ------   4.1 SURVIVAL PLOTS (all iterations) -----
+## ------   4. SURVIVAL PLOTS (all iterations) -----
 n.months <- nimConstants$n.months
 temp <- nimConstants$temp
 month <- nimConstants$month
@@ -946,102 +923,161 @@ for(d in 1:2){
     }#m
   }#ss
 }#s
+dimnames(PHI) <- list( 
+  iteration = 1:dim(res$sims.list$beta.temp)[1],
+  status = c("protected","degraded"),
+  sex = c("female","male"),
+  translocated = c("no","yes"),
+  month = 1:n.months)
 
 mean.PHI <- apply(PHI, c(2,3,4,5), mean)
 upper.PHI <- apply(PHI, c(2,3,4,5), function(x)quantile(x,0.975))
 lower.PHI <- apply(PHI, c(2,3,4,5), function(x)quantile(x,0.025))
 dim(lower.PHI)
 
-##----
-pdf(file.path(analysisDir, modelName, "survivalProbabilities_all iterations2.pdf"),
-    width = 10, height = 10)
+
+##-- Identify first month w/ translocation
+test <- cbind.data.frame( 
+  transloc = nimConstants$transloc,
+  sex = nimConstants$sex,
+  status = nimConstants$status,
+  startM = nimConstants$start.int[ ,1]) %>%
+  filter(., transloc == 2)
+
+start <- matrix(NA,2,2)
+start[1,1] <- min(test$startM[test$status == 1 & test$sex == 1])
+start[1,2] <- min(test$startM[test$status == 1 & test$sex == 2])
+start[2,1] <- min(test$startM[test$status == 2 & test$sex == 1])
+start[2,2] <- min(test$startM[test$status == 2 & test$sex == 2])
+
+##-- Plot Survival
+# pdf(file.path( analysisDir, modelName,
+#                "survivalProbabilities_all iterations.pdf"),
+#     width = 10, height = 12)
 par(mfrow = c(2,2))
-
-##-- Females protected plot ----
-par(mar = c(0,4,6,0))
-plot(1, type = "n", xlim = c(0,n.months+1), ylim = c(0, 1), axes = F,
-     ylab = "Survival probability",
-     xlab = "",
-     main = "Females")
-axis(1, at = seq(11,260,24), labels = seq(1999,2019,2))
-axis(2, at = seq(0,1,0.2), labels = seq(0,1,0.2))
-polygon(x = c(1:n.months,n.months:1),
-        y = c(upper.PHI[2,1,2, ],rev(lower.PHI[2,1,2, ])),
-        col = adjustcolor(myCols[2],alpha.f = 0.5), border = F)
-points(1:n.months, mean.PHI[2,1,2, ], type = "l", lwd = 3, col = myCols[2])
-polygon(x = c(1:n.months,n.months:1),
-        y = c(upper.PHI[2,1,1, ],rev(lower.PHI[2,1,1, ])),
-        col = adjustcolor(myCols[4],alpha.f = 0.5), border = F)
-points(1:n.months, mean.PHI[2,1,1, ], type = "l", lwd = 3, col = myCols[4])
-
-##-- Males protected plot ----
-par(mar = c(0,2,6,2))
-plot(1, type = "n", xlim = c(0,n.months+1), ylim = c(0, 1), axes = F,
-     ylab = "",
-     xlab = "",
-     main = "Males")
-axis(1, at = seq(11,260,24), labels = seq(1999,2019,2))
-axis(2, at = seq(0,1,0.2), labels = seq(0,1,0.2))
-polygon(x = c(1:n.months,n.months:1),
-        y = c(upper.PHI[2,2,2, ],rev(lower.PHI[2,2,2, ])),
-        col = adjustcolor(myCols[2],alpha.f = 0.5), border = F)
-points(1:n.months, mean.PHI[2,2,2, ], type = "l", lwd = 3, col = myCols[2])
-polygon(x = c(1:n.months,n.months:1),
-        y = c(upper.PHI[2,2,1, ],rev(lower.PHI[2,2,1, ])),
-        col = adjustcolor(myCols[4],alpha.f = 0.5), border = F)
-points(1:n.months, mean.PHI[2,2,1, ], type = "l", lwd = 3, col = myCols[4])
-
-
-##-- Females fragmented plot ----
-par(mar = c(4,4,2,0))
-plot(1, type = "n", xlim = c(0,n.months+1), ylim = c(0, 1), axes = F,
-     ylab = "Survival probability",
-     xlab = "",
-     main = "")
-axis(1, at = seq(11,260,24), labels = seq(1999,2019,2))
-axis(2, at = seq(0,1,0.2), labels = seq(0,1,0.2))
-polygon(x = c(1:n.months,n.months:1),
-        y = c(upper.PHI[1,1,2, ],rev(lower.PHI[1,1,2, ])),
-        col = adjustcolor(myCols[2],alpha.f = 0.5), border = F)
-points(1:n.months, mean.PHI[1,1,2, ], type = "l", lwd = 3, col = myCols[2])
-polygon(x = c(1:n.months,n.months:1),
-        y = c(upper.PHI[1,1,1, ],rev(lower.PHI[1,1,1, ])),
-        col = adjustcolor(myCols[4],alpha.f = 0.5), border = F)
-points(1:n.months, mean.PHI[1,1,1, ], type = "l", lwd = 3, col = myCols[4])
-
-##-- Males fragmented plot ----
-par(mar = c(4,2,2,2))
-plot(1, type = "n", xlim = c(0,n.months+1), ylim = c(0, 1), axes = F,
-     ylab = "",
-     xlab = "",
-     main = "")
-axis(1, at = seq(11,260,24), labels = seq(1999,2019,2))
-axis(2, at = seq(0,1,0.2), labels = seq(0,1,0.2))
-polygon(x = c(1:n.months,n.months:1),
-        y = c(upper.PHI[1,2,2, ],rev(lower.PHI[1,2,2, ])),
-        col = adjustcolor(myCols[2],alpha.f = 0.5), border = F)
-points(1:n.months, mean.PHI[1,2,2, ], type = "l", lwd = 3, col = myCols[2])
-polygon(x = c(1:n.months,n.months:1),
-        y = c(upper.PHI[1,2,1, ],rev(lower.PHI[1,2,1, ])),
-        col = adjustcolor(myCols[4],alpha.f = 0.5), border = F)
-points(1:n.months, mean.PHI[1,2,1, ], type = "l", lwd = 3, col = myCols[4])
-
-dev.off()
+sex <- c("females", "males")
+status <- c("degraded", "protected")
+for(f in 1:2){
+  for(s in 1:2){
+    plot(1, type = "n",
+         xlim = c(0,n.months+1),
+         ylim = c(0, 1),
+         axes = F,
+         ylab = "Survival prob.",
+         xlab = "Months",
+         main = paste0(status[f],"-", sex[s]))
+    axis(1, at = seq(0,250,50), labels = seq(0,250,50))
+    axis(2, at = seq(0,1,0.2), labels = seq(0,1,0.2))
+    legend( x = 1, y = 0.2,
+            title = "Individual status:",
+            legend = c("resident", "translocated"),
+            bty = "n",
+            fill = myCols[c(2,4)])
+    
+    polygon(x = c(1:n.months,n.months:1),
+            y = c(upper.PHI[f,s,1, ],rev(lower.PHI[f,s,1, ])),
+            col = adjustcolor(myCols[2],alpha.f = 0.5), border = F)
+    points(1:n.months, mean.PHI[f,s,1,1:n.months], type = "l", lwd = 2, col = myCols[2])
+    
+    polygon(x = c(start[f,s]:n.months,n.months:start[f,s]),
+            y = c( upper.PHI[f,s,2,start[f,s]:n.months],
+                   rev(lower.PHI[f,s,2,start[f,s]:n.months])),
+            col = adjustcolor(myCols[4],alpha.f = 0.5), border = F)
+    points(start[f,s]:n.months, mean.PHI[f,s,2,start[f,s]:n.months], type = "l", lwd = 2, col = myCols[4])
+  }#s
+}#f
+# graphics.off()
 
 
 
 
+##----
+# pdf(file.path(analysisDir, modelName, "survivalProbabilities_all iterations.pdf"),
+#     width = 10, height = 10)
+# par(mfrow = c(2,2))
+# ##-- Females protected plot ----
+# par(mar = c(0,4,6,0))
+# plot(1, type = "n", xlim = c(0,n.months+1), ylim = c(0, 1), axes = F,
+#      ylab = "Survival probability",
+#      xlab = "",
+#      main = "Females")
+# axis(1, at = seq(11,260,24), labels = seq(1999,2019,2))
+# axis(2, at = seq(0,1,0.2), labels = seq(0,1,0.2))
+# polygon(x = c(1:n.months,n.months:1),
+#         y = c(upper.PHI[2,1,2, ],rev(lower.PHI[2,1,2, ])),
+#         col = adjustcolor(myCols[2],alpha.f = 0.5), border = F)
+# points(1:n.months, mean.PHI[2,1,2, ], type = "l", lwd = 3, col = myCols[2])
+# polygon(x = c(1:n.months,n.months:1),
+#         y = c(upper.PHI[2,1,1, ],rev(lower.PHI[2,1,1, ])),
+#         col = adjustcolor(myCols[4],alpha.f = 0.5), border = F)
+# points(1:n.months, mean.PHI[2,1,1, ], type = "l", lwd = 3, col = myCols[4])
+# 
+# ##-- Males protected plot ----
+# par(mar = c(0,2,6,2))
+# plot(1, type = "n", xlim = c(0,n.months+1), ylim = c(0, 1), axes = F,
+#      ylab = "",
+#      xlab = "",
+#      main = "Males")
+# axis(1, at = seq(11,260,24), labels = seq(1999,2019,2))
+# axis(2, at = seq(0,1,0.2), labels = seq(0,1,0.2))
+# polygon(x = c(1:n.months,n.months:1),
+#         y = c(upper.PHI[2,2,2, ],rev(lower.PHI[2,2,2, ])),
+#         col = adjustcolor(myCols[2],alpha.f = 0.5), border = F)
+# points(1:n.months, mean.PHI[2,2,2, ], type = "l", lwd = 3, col = myCols[2])
+# polygon(x = c(1:n.months,n.months:1),
+#         y = c(upper.PHI[2,2,1, ],rev(lower.PHI[2,2,1, ])),
+#         col = adjustcolor(myCols[4],alpha.f = 0.5), border = F)
+# points(1:n.months, mean.PHI[2,2,1, ], type = "l", lwd = 3, col = myCols[4])
+# 
+# 
+# ##-- Females fragmented plot ----
+# par(mar = c(4,4,2,0))
+# plot(1, type = "n", xlim = c(0,n.months+1), ylim = c(0, 1), axes = F,
+#      ylab = "Survival probability",
+#      xlab = "",
+#      main = "")
+# axis(1, at = seq(11,260,24), labels = seq(1999,2019,2))
+# axis(2, at = seq(0,1,0.2), labels = seq(0,1,0.2))
+# polygon(x = c(1:n.months,n.months:1),
+#         y = c(upper.PHI[1,1,2, ],rev(lower.PHI[1,1,2, ])),
+#         col = adjustcolor(myCols[2],alpha.f = 0.5), border = F)
+# points(1:n.months, mean.PHI[1,1,2, ], type = "l", lwd = 3, col = myCols[2])
+# polygon(x = c(1:n.months,n.months:1),
+#         y = c(upper.PHI[1,1,1, ],rev(lower.PHI[1,1,1, ])),
+#         col = adjustcolor(myCols[4],alpha.f = 0.5), border = F)
+# points(1:n.months, mean.PHI[1,1,1, ], type = "l", lwd = 3, col = myCols[4])
+# 
+# ##-- Males fragmented plot ----
+# par(mar = c(4,2,2,2))
+# plot(1, type = "n", xlim = c(0,n.months+1), ylim = c(0, 1), axes = F,
+#      ylab = "",
+#      xlab = "",
+#      main = "")
+# axis(1, at = seq(11,260,24), labels = seq(1999,2019,2))
+# axis(2, at = seq(0,1,0.2), labels = seq(0,1,0.2))
+# polygon(x = c(1:n.months,n.months:1),
+#         y = c(upper.PHI[1,2,2, ],rev(lower.PHI[1,2,2, ])),
+#         col = adjustcolor(myCols[2],alpha.f = 0.5), border = F)
+# points(1:n.months, mean.PHI[1,2,2, ], type = "l", lwd = 3, col = myCols[2])
+# polygon(x = c(1:n.months,n.months:1),
+#         y = c(upper.PHI[1,2,1, ],rev(lower.PHI[1,2,1, ])),
+#         col = adjustcolor(myCols[4],alpha.f = 0.5), border = F)
+# points(1:n.months, mean.PHI[1,2,1, ], type = "l", lwd = 3, col = myCols[4])
+# 
+# dev.off()
 
-## ------   4.2. ANNUAL SURVIVAL PLOTS (all iterations) -----
+
+
+## ------   5. ANNUAL SURVIVAL PLOTS (all iterations) -----
 temp <- weather$T[weather$index >= 1 & weather$index <= (maxMonth+12)]
 temp <- as.numeric(scale(temp))
 n.months <- length(temp)
-month <- seq(from = min(nimConstants$month),
-             to = max(nimConstants$month) + 5*0.01371924,
-             by = 0.01371924)
+month <- seq( from = min(nimConstants$month),
+              to = max(nimConstants$month) + 5*0.01371924,
+              by = 0.01371924)
 
 MPHI <- array(NA, c(dim(res$sims.list$beta.temp)[1],2,n.months))
-PHI <- array(NA, c(dim(res$sims.list$beta.temp)[1],2,2,2,n.months-11))
+mean.PHI <- upper.PHI <- lower.PHI <- array(NA, c(2,2,2,n.months-11))
 frag <- c("protected","disturbed")
 sex <- c("females", "males")
 for(d in 1:2){
@@ -1057,38 +1093,64 @@ for(d in 1:2){
                                  res$sims.list$beta.transloc[ ,d,s] * res$sims.list$z.transloc[ ,d,s])
     }#m
     for(m in 1:(n.months-11)){
-      PHI[ ,d,s,1,m] <- apply(MPHI[ ,1,m:(m+11)],1,prod)
-      PHI[ ,d,s,2,m] <- apply(MPHI[ ,2,m:(m+11)],1,prod)
+      PHI1 <- apply(MPHI[ ,1,m:(m+11)],1,prod)
+      PHI2 <- apply(MPHI[ ,2,m:(m+11)],1,prod)
+      
+      mean.PHI[d,s,1,m] <- mean(PHI1)
+      upper.PHI[d,s,1,m] <- quantile(PHI1,0.975)
+      lower.PHI[d,s,1,m] <- quantile(PHI1,0.025)
+      
+      mean.PHI[d,s,2,m] <- mean(PHI2)
+      upper.PHI[d,s,2,m] <- quantile(PHI2,0.975)
+      lower.PHI[d,s,2,m] <- quantile(PHI2,0.025)
     }#m
-  }#ss
-}#s
+    print(paste0("sex : ",s))
+  }#s
+  print(paste0("status : ",d))
+}#d
 
-mean.PHI <- apply(PHI, c(2,3,4,5), mean)
-upper.PHI <- apply(PHI, c(2,3,4,5), function(x)quantile(x,0.975))
-lower.PHI <- apply(PHI, c(2,3,4,5), function(x)quantile(x,0.025))
-dim(lower.PHI)
+##-- Identify first month w/ translocation
+test <- cbind.data.frame( 
+  transloc = nimConstants$transloc,
+  sex = nimConstants$sex,
+  status = nimConstants$status,
+  startM = nimConstants$start.int[ ,1]) %>%
+  filter(., transloc == 2)
+
+start <- matrix(NA,2,2)
+start[1,1] <- min(test$startM[test$status == 1 & test$sex == 1])
+start[1,2] <- min(test$startM[test$status == 1 & test$sex == 2])
+start[2,1] <- min(test$startM[test$status == 2 & test$sex == 1])
+start[2,2] <- min(test$startM[test$status == 2 & test$sex == 2])
+
+
 
 ##----
-pdf(file.path(analysisDir, modelName, "annualSurvivalProbabilities_all iterations2.pdf"),
+pdf(file.path(analysisDir, modelName, "annualSurvivalProbabilities_all iterations.pdf"),
     width = 10, height = 10)
 par(mfrow = c(2,2))
 n.months = dim(lower.PHI)[4]
+
+
 ##-- Females protected plot ----
 par(mar = c(0,4,6,0))
-plot(1, type = "n", xlim = c(0,n.months+1), ylim = c(0, 0.6), axes = F,
+plot(1, type = "n", xlim = c(0,n.months+1), ylim = c(0,0.6), axes = F,
      ylab = "Survival probability",
      xlab = "",
      main = "Females")
 axis(1, at = seq(11,260,24), labels = seq(1999,2019,2))
 axis(2, at = seq(0,0.6,0.1), labels = seq(0,0.6,0.1))
-polygon(x = c(1:n.months,n.months:1),
-        y = c(upper.PHI[2,1,2, ],rev(lower.PHI[2,1,2, ])),
+polygon(x = c(start[2,1]:n.months,n.months:start[2,1]),
+        y = c( upper.PHI[2,1,2,start[2,1]:n.months],
+               rev(lower.PHI[2,1,2,start[2,1]:n.months])),
         col = adjustcolor(myCols[2],alpha.f = 0.5), border = F)
-points(1:n.months, mean.PHI[2,1,2, ], type = "l", lwd = 3, col = myCols[2])
+points( start[2,1]:n.months, mean.PHI[2,1,2,start[2,1]:n.months],
+        type = "l", lwd = 3, col = myCols[2])
 polygon(x = c(1:n.months,n.months:1),
         y = c(upper.PHI[2,1,1, ],rev(lower.PHI[2,1,1, ])),
         col = adjustcolor(myCols[4],alpha.f = 0.5), border = F)
 points(1:n.months, mean.PHI[2,1,1, ], type = "l", lwd = 3, col = myCols[4])
+
 
 ##-- Males protected plot ----
 par(mar = c(0,2,6,2))
@@ -1098,10 +1160,12 @@ plot(1, type = "n", xlim = c(0,n.months+1), ylim = c(0, 0.6), axes = F,
      main = "Males")
 axis(1, at = seq(11,260,24), labels = seq(1999,2019,2))
 axis(2, at = seq(0,0.6,0.1), labels = seq(0,0.6,0.1))
-polygon(x = c(1:n.months,n.months:1),
-        y = c(upper.PHI[2,2,2, ],rev(lower.PHI[2,2,2, ])),
+polygon(x = c(start[2,2]:n.months,n.months:start[2,2]),
+        y = c(upper.PHI[2,2,2,start[2,2]:n.months],
+              rev(lower.PHI[2,2,2,start[2,2]:n.months])),
         col = adjustcolor(myCols[2],alpha.f = 0.5), border = F)
-points(1:n.months, mean.PHI[2,2,2, ], type = "l", lwd = 3, col = myCols[2])
+points(start[2,2]:n.months, mean.PHI[2,2,2,start[2,2]:n.months],
+       type = "l", lwd = 3, col = myCols[2])
 polygon(x = c(1:n.months,n.months:1),
         y = c(upper.PHI[2,2,1, ],rev(lower.PHI[2,2,1, ])),
         col = adjustcolor(myCols[4],alpha.f = 0.5), border = F)
@@ -1116,14 +1180,17 @@ plot(1, type = "n", xlim = c(0,n.months+1), ylim = c(0, 0.6), axes = F,
      main = "")
 axis(1, at = seq(11,260,24), labels = seq(1999,2019,2))
 axis(2, at = seq(0,0.6,0.1), labels = seq(0,0.6,0.1))
-polygon(x = c(1:n.months,n.months:1),
-        y = c(upper.PHI[1,1,2, ],rev(lower.PHI[1,1,2, ])),
+polygon(x = c(start[1,1]:n.months,n.months:start[1,1]),
+        y = c(upper.PHI[1,1,2,start[1,1]:n.months],
+              rev(lower.PHI[1,1,2,start[1,1]:n.months])),
         col = adjustcolor(myCols[2],alpha.f = 0.5), border = F)
-points(1:n.months, mean.PHI[1,1,2, ], type = "l", lwd = 3, col = myCols[2])
+points(start[1,1]:n.months, mean.PHI[1,1,2,start[1,1]:n.months],
+       type = "l", lwd = 3, col = myCols[2])
 polygon(x = c(1:n.months,n.months:1),
         y = c(upper.PHI[1,1,1, ],rev(lower.PHI[1,1,1, ])),
         col = adjustcolor(myCols[4],alpha.f = 0.5), border = F)
 points(1:n.months, mean.PHI[1,1,1, ], type = "l", lwd = 3, col = myCols[4])
+
 
 ##-- Males fragmented plot ----
 par(mar = c(4,2,2,2))
@@ -1133,10 +1200,12 @@ plot(1, type = "n", xlim = c(0,n.months+1), ylim = c(0, 0.6), axes = F,
      main = "")
 axis(1, at = seq(11,260,24), labels = seq(1999,2019,2))
 axis(2, at = seq(0,0.6,0.1), labels = seq(0,0.6,0.1))
-polygon(x = c(1:n.months,n.months:1),
-        y = c(upper.PHI[1,2,2, ],rev(lower.PHI[1,2,2, ])),
+polygon(x = c(start[1,2]:n.months,n.months:start[1,2]),
+        y = c(upper.PHI[1,2,2,start[1,2]:n.months],
+              rev(lower.PHI[1,2,2,start[1,2]:n.months])),
         col = adjustcolor(myCols[2],alpha.f = 0.5), border = F)
-points(1:n.months, mean.PHI[1,2,2, ], type = "l", lwd = 3, col = myCols[2])
+points(start[1,2]:n.months, mean.PHI[1,2,2,start[1,2]:n.months],
+       type = "l", lwd = 3, col = myCols[2])
 polygon(x = c(1:n.months,n.months:1),
         y = c(upper.PHI[1,2,1, ],rev(lower.PHI[1,2,1, ])),
         col = adjustcolor(myCols[4],alpha.f = 0.5), border = F)
@@ -1150,11 +1219,14 @@ dev.off()
 
 
 
-## ------   4.2. VIOLIN PLOTS (all iterations) -----
+## ------   4.3. VIOLIN PLOTS -----
 pdf(file.path(analysisDir, modelName, "Coefficient_Plot.pdf"),
     width = 12, height = 10)
 
-ggplot(betas.df, aes(value, variable.simple, alpha = as.numeric(p.inclusion))) +
+ggplot( betas.df,
+        aes( value,
+             variable.simple,
+             alpha = as.numeric(p.inclusion))) +
   geom_violin(
     draw_quantiles = c(0.025, 0.5, 0.975),
     fill = "turquoise",
@@ -1165,87 +1237,78 @@ ggplot(betas.df, aes(value, variable.simple, alpha = as.numeric(p.inclusion))) +
 
 dev.off()
 
+# mydata <- data.frame(myGroup = c('a', 'b'),
+#                      myX = c(1,1))
+# ggplot(data = mydata) + 
+#   geom_bar(aes(myX)) + 
+#   facet_wrap(~myGroup)
 
-mydata <- data.frame(myGroup = c('a', 'b'),
-                     myX = c(1,1))
+## ------   4.4. SURVIVAL TEMPERATURE PLOTS (all iterations) -----
+temp <- seq(min(nimConstants$temp), max(nimConstants$temp), by = 0.05)
+n.temp <- length(temp)
+month <- mean(nimConstants$month)
 
-ggplot(data = mydata) + 
-  geom_bar(aes(myX)) + 
-  facet_wrap(~myGroup)
-
-
-
-
-plot(1, type = "n", xlim = c(0,n.months+1), ylim = c(0, 0.6), axes = F,
-     ylab = "Survival probability",
-     xlab = "",
-     main = "Females")
-axis(1, at = seq(11,260,24), labels = seq(1999,2019,2))
-axis(2, at = seq(0,0.6,0.1), labels = seq(0,0.6,0.1))
-polygon(x = c(1:n.months,n.months:1),
-        y = c(upper.PHI[2,1,2, ],rev(lower.PHI[2,1,2, ])),
-        col = adjustcolor(myCols[2],alpha.f = 0.5), border = F)
-points(1:n.months, mean.PHI[2,1,2, ], type = "l", lwd = 3, col = myCols[2])
-polygon(x = c(1:n.months,n.months:1),
-        y = c(upper.PHI[2,1,1, ],rev(lower.PHI[2,1,1, ])),
-        col = adjustcolor(myCols[4],alpha.f = 0.5), border = F)
-points(1:n.months, mean.PHI[2,1,1, ], type = "l", lwd = 3, col = myCols[4])
-
-##-- Males protected plot ----
-par(mar = c(0,2,6,2))
-plot(1, type = "n", xlim = c(0,n.months+1), ylim = c(0, 0.6), axes = F,
-     ylab = "",
-     xlab = "",
-     main = "Males")
-axis(1, at = seq(11,260,24), labels = seq(1999,2019,2))
-axis(2, at = seq(0,0.6,0.1), labels = seq(0,0.6,0.1))
-polygon(x = c(1:n.months,n.months:1),
-        y = c(upper.PHI[2,2,2, ],rev(lower.PHI[2,2,2, ])),
-        col = adjustcolor(myCols[2],alpha.f = 0.5), border = F)
-points(1:n.months, mean.PHI[2,2,2, ], type = "l", lwd = 3, col = myCols[2])
-polygon(x = c(1:n.months,n.months:1),
-        y = c(upper.PHI[2,2,1, ],rev(lower.PHI[2,2,1, ])),
-        col = adjustcolor(myCols[4],alpha.f = 0.5), border = F)
-points(1:n.months, mean.PHI[2,2,1, ], type = "l", lwd = 3, col = myCols[4])
-
-
-##-- Females fragmented plot ----
-par(mar = c(4,4,2,0))
-plot(1, type = "n", xlim = c(0,n.months+1), ylim = c(0, 0.6), axes = F,
-     ylab = "Survival probability",
-     xlab = "",
-     main = "")
-axis(1, at = seq(11,260,24), labels = seq(1999,2019,2))
-axis(2, at = seq(0,0.6,0.1), labels = seq(0,0.6,0.1))
-polygon(x = c(1:n.months,n.months:1),
-        y = c(upper.PHI[1,1,2, ],rev(lower.PHI[1,1,2, ])),
-        col = adjustcolor(myCols[2],alpha.f = 0.5), border = F)
-points(1:n.months, mean.PHI[1,1,2, ], type = "l", lwd = 3, col = myCols[2])
-polygon(x = c(1:n.months,n.months:1),
-        y = c(upper.PHI[1,1,1, ],rev(lower.PHI[1,1,1, ])),
-        col = adjustcolor(myCols[4],alpha.f = 0.5), border = F)
-points(1:n.months, mean.PHI[1,1,1, ], type = "l", lwd = 3, col = myCols[4])
-
-##-- Males fragmented plot ----
-par(mar = c(4,2,2,2))
-plot(1, type = "n", xlim = c(0,n.months+1), ylim = c(0, 0.6), axes = F,
-     ylab = "",
-     xlab = "",
-     main = "")
-axis(1, at = seq(11,260,24), labels = seq(1999,2019,2))
-axis(2, at = seq(0,0.6,0.1), labels = seq(0,0.6,0.1))
-polygon(x = c(1:n.months,n.months:1),
-        y = c(upper.PHI[1,2,2, ],rev(lower.PHI[1,2,2, ])),
-        col = adjustcolor(myCols[2],alpha.f = 0.5), border = F)
-points(1:n.months, mean.PHI[1,2,2, ], type = "l", lwd = 3, col = myCols[2])
-polygon(x = c(1:n.months,n.months:1),
-        y = c(upper.PHI[1,2,1, ],rev(lower.PHI[1,2,1, ])),
-        col = adjustcolor(myCols[4],alpha.f = 0.5), border = F)
-points(1:n.months, mean.PHI[1,2,1, ], type = "l", lwd = 3, col = myCols[4])
-
-dev.off()
-
-
+##-- Plot Survival
+pdf(file.path( analysisDir, modelName,
+               "survivalTemperature_all iterations.pdf"),
+    width = 10, height = 10)
+par(mfrow = c(2,2))
+sex <- c("females", "males")
+status <- c("Disturbed", "Protected")
+for(d in 1:2){
+  for(s in 1:2){
+    plot(1, type = "n",
+         xlim = c(min(nimConstants$temp),max(nimConstants$temp)+0.2),
+         ylim = c(0, 1),
+         axes = F,
+         ylab = "Survival prob.",
+         xlab = "Temperature",
+         main = paste0(status[d],"-", sex[s]))
+    axis(1,
+         at = seq(min(nimConstants$temp)+0.1*0.4385646,
+                  max(nimConstants$temp)+0.5*0.4385646,
+                  by = 0.4385646),
+         labels = seq(20, 29, by = 1))
+    axis(2, at = seq(0,1,0.2), labels = seq(0,1,0.2))
+    legend( x = 1, y = 0.2,
+            title = "Individual status:",
+            legend = c("resident", "translocated"),
+            bty = "n",
+            fill = myCols[c(2,4)])
+    
+    ## Calculate PHI
+    PHI.resid <- PHI.trns <- matrix(NA,dim(res$sims.list$beta.temp)[1],n.temp)
+    for(t in 1:n.temp){
+      PHI.resid[ ,t] <- ilogit(res$sims.list$logit.phi0[ ,d,s] +
+                                 res$sims.list$beta.temp[ ,d,s] * res$sims.list$z.temp[ ,d,s] * temp[t] +
+                                 res$sims.list$beta.time[ ,d,s] * res$sims.list$z.time[ ,d,s] * month)
+      
+      PHI.trns[ ,t] <- ilogit(res$sims.list$logit.phi0[ ,d,s] +
+                                 res$sims.list$beta.temp[ ,d,s] * res$sims.list$z.temp[ ,d,s] * temp[t] +
+                                 res$sims.list$beta.time[ ,d,s] * res$sims.list$z.time[ ,d,s] * month +
+                                 res$sims.list$beta.transloc[ ,d,s] * res$sims.list$z.transloc[ ,d,s])
+    }#t
+    
+    mean.PHI.resid <- apply(PHI.resid, 2, mean)
+    upper.PHI.resid  <- apply(PHI.resid, 2, function(x)quantile(x,0.975))
+    lower.PHI.resid  <- apply(PHI.resid, 2, function(x)quantile(x,0.025))
+    
+    mean.PHI.trns <- apply(PHI.trns, 2, mean)
+    upper.PHI.trns  <- apply(PHI.trns, 2, function(x)quantile(x,0.975))
+    lower.PHI.trns  <- apply(PHI.trns, 2, function(x)quantile(x,0.025))
+    
+    polygon(x = c(temp,rev(temp)),
+            y = c(upper.PHI.trns,rev(lower.PHI.trns)),
+            col = adjustcolor(myCols[2],alpha.f = 0.5), border = F)
+    points(temp, mean.PHI.trns, type = "l", lwd = 2, col = myCols[2])
+    
+    polygon(x = c(temp,rev(temp)),
+            y = c(upper.PHI.resid,rev(lower.PHI.resid)),
+            col = adjustcolor(myCols[4],alpha.f = 0.5), border = F)
+    points(temp, mean.PHI.resid, type = "l", lwd = 2, col = myCols[4])
+  }#s
+}#f
+graphics.off()
 
 
 
@@ -1307,35 +1370,62 @@ dev.off()
 
 
 ## ------   6. TABLES -----
+##---- Calculate "phi0" from "lphi0"
+tmp <- betas.df[betas.df$variable.simple == "lphi0", ]
+tmp$value <- ilogit(tmp$value)
+tmp$variable.simple <- "phi0"
+betas.df <- rbind(betas.df,tmp)
+
+
+##---- Summarize parameter estimaets
+getCleanEstimates <- function(x,
+                              moment = "mean",
+                              quantiles = c(0.025,0.975)){
+  if(moment == "mean"){
+    paste0(format(round(mean(x),digits = 2),nsmall = 2)," (",
+           format(round(quantile(x, probs = quantiles[1]), digits = 2),nsmall = 2), "-",
+           format(round(quantile(x, probs = quantiles[2]), digits = 2),nsmall = 2), ")")
+  } else {
+    paste0(format(round(median(x), digits = 2),nsmall = 2)," (",
+           format(round(quantile(x, probs = quantiles[1]), digits = 2),nsmall = 2), "-",
+           format(round(quantile(x, probs = quantiles[2]), digits = 2),nsmall = 2), ")")
+  }# else
+}
+
+summary <- betas.df %>% 
+  group_by(variable.simple,sex,status) %>%
+  summarize( estimate = getCleanEstimates(value))
+
+
 ##---- Create empty table
 survival <-  matrix(NA, nrow = 5, ncol = 4)
 rownames(survival) <- c("","phi0", "beta.time", "beta.temp", "beta.transloc")
-colnames(survival) <- c("Protected", "Protected", "Degraded", "Degraded")
-survival[1, ] <- c("F", "M", "F", "M")
-survival[2, ] <- paste0( round(plogis(res$mean$logit.phi0), 2),
-                         " (",  round(plogis(res$q2.5$logit.phi0),2),
-                         "-", round(plogis(res$q97.5$logit.phi0),2), ")")
-survival[3, ] <- paste0( round(res$mean$beta.time, 2),
-                         " (",  round(res$q2.5$beta.time,2),
-                         "-", round(res$q97.5$beta.time,2), ")")
-survival[4, ] <- paste0( round(plogis(res$mean$beta.temp), 2),
-                         " (",  round(res$q2.5$beta.temp,2),
-                         "-", round(res$q97.5$beta.temp,2), ")")
-survival[5, ] <- paste0( round(res$mean$beta.transloc, 2),
-                         " (",  round(res$q2.5$beta.transloc,2),
-                         "-", round(res$q97.5$beta.transloc,2), ")")
+colnames(survival) <- c("protected", "protected", "fragmented", "fragmented")
+survival[1, ] <- c("female", "male", "female", "male")
+for(s in c("female","male")){
+  for(d in c("protected","fragmented")){
+  
+    thisCol <- colnames(survival) == d & survival[1, ] == s
+     tmp <- filter(summary, sex == s, status == d)
+    
+    survival[2,thisCol] <- tmp$estimate[tmp$variable.simple == "phi0"]
+    survival[3,thisCol] <- tmp$estimate[tmp$variable.simple == "time"]
+    survival[4,thisCol] <- tmp$estimate[tmp$variable.simple == "temp"]
+    survival[5,thisCol] <- tmp$estimate[tmp$variable.simple == "transloc"]
+  }
+}
 
 addtorow <- list()
 addtorow$pos <- list(0, 0, c(2,4))
-addtorow$command <- c(paste0(paste0('& \\multicolumn{2}{c}{',
-                                    sort(unique(colnames(survival))),
+addtorow$command <- c(paste0(paste0(' & \\multicolumn{2}{c}{',
+                                    c("Protected","Disturbed"),
                                     '}', collapse = ''), '\\\\'),
                       "\\rowcolor[gray]{.85}",
                       "\\rowcolor[gray]{.95}")
 
 print(xtable(survival, type = "latex",
              align = paste(c("l",rep("c",ncol(survival))),collapse = "")),
-      floating = FALSE,include.colnames=F, include.rownames = TRUE,
+      floating = FALSE, include.colnames = FALSE, include.rownames = TRUE,
       add.to.row = addtorow,
       file = file.path(analysisDir, modelName, "Params.tex"))
 
@@ -1348,3 +1438,4 @@ write.csv( survival,
 
 ## -----------------------------------------------------------------------------
 
+ 
