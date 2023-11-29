@@ -22,8 +22,8 @@ source("workingDirectories.R")
 modelName <- "m_phi[status_sex_temp_time_transloc]_p[site_sex_temp]_RJ"
 source("C:/My_documents/RovQuant/Temp/PD/FUNCTIONS/FunctionScripts/wildMap.R")
 myCols <- wildMap(4)
-source(file.path(analysisDir, "ProcessCodaOutput_v3.R"))
-source(file.path(analysisDir, "PlotViolins.R"))
+source("Analyses/ProcessCodaOutput_v3.R")
+source("Analyses/PlotViolins.R")
 
 
 
