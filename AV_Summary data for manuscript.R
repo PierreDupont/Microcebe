@@ -18,6 +18,8 @@ R.utils::sourceDirectory("C:/Users/anvargas/Source",modifiedOnly = FALSE)
 
 modelName <- "m_phi[status_sex_temp_time_transloc]_p[site_sex_temp]_RJ"
 
+#modelName<-"NimbleOutFORm_phi[status_sex_temp_time_transloc]_p[site_sex_temp]_RJ8.RData"
+
 ## ------ SOURCE THE REQUIRED FUNCTIONS ------
 #source("C:/Users/anvargas/Source")#,modifiedOnly = FALSE)
 
@@ -273,6 +275,10 @@ n.ind <- capture_data %>% select(transponder, Sexe) %>%
 load(file.path(analysisDir, modelName, "inFiles", paste0(modelName,"1.RData")))
 load(file.path(analysisDir, modelName, paste0("outFiles/output.RData")))
 load(file.path(analysisDir, modelName, paste0("outFiles/processed_output.RData")))
+load(paste0(analysisDir,"/", modelName, "/outFiles/", "NimbleOutFOR",modelName, "8.RData"))
+
+class(nimOutput)
+res <- ProcessCodaOutput(nimOutput)
 
 res$mean$beta.time
 res$q2.5$beta.time
