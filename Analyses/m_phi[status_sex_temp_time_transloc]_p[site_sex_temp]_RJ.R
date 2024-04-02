@@ -1078,7 +1078,12 @@ month <- seq( from = min(nimConstants$month),
 
 MPHI <- array(NA, c(dim(res$sims.list$beta.temp)[1],2,n.months))
 mean.PHI <- upper.PHI <- lower.PHI <- array(NA, c(2,2,2,n.months-11))
-frag <- c("protected","disturbed")
+dimnames(mean.PHI) <- dimnames(upper.PHI) <- dimnames(lower.PHI) <- list("fragments" = c("disturbed","protected"),
+                                                                         "sex" = c("females", "males"),
+                                                                         "status" = c("resident", "translocated"),
+                                                                         "month" = 1:(n.months-11))
+
+frag <- c("disturbed","protected")
 sex <- c("females", "males")
 for(d in 1:2){
   for(s in 1:2){
@@ -1108,6 +1113,17 @@ for(d in 1:2){
   }#s
   print(paste0("status : ",d))
 }#d
+
+##-- Calculate mean survival rates
+average.PHI <- apply(mean.PHI,c(1,2,3),mean)
+
+##-- % difference between protected and disturbed fragments
+(average.PHI[2, ,]-average.PHI[1,, ])/average.PHI[1,, ]
+
+##-- % difference between translocated and residents
+average.PHI <- apply(mean.PHI,c(3),mean)
+
+(average.PHI[ 1]-average.PHI[ 2])/average.PHI[ 1]
 
 ##-- Identify first month w/ translocation
 test <- cbind.data.frame( 
